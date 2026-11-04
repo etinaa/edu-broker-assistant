@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: broker-assistant
+
+# Провайдер выбирается здесь (или переменной LLM_PROVIDER) — код не меняется (задание 2).
+llm:
+  provider: ${LLM_PROVIDER:ollama}        # ollama | claude
+  claude:
+    model: ${CLAUDE_MODEL:claude-haiku-4-5}
+    api-key: ${ANTHROPIC_API_KEY:}
+    max-tokens: 1024
+    # Цены в USD за миллион токенов — сверить с актуальным прайсом Anthropic для выбранной модели.
+    input-price-per-million: 1.00
+    output-price-per-million: 5.00
+  ollama:
+    base-url: http://localhost:11434
+    model: "${OLLAMA_MODEL:qwen2.5:14b}"
+    # Окно контекста: история сессии + определения инструментов должны в него помещаться (урок 1.5).
+    num-ctx: 16384
+
+agent:
+  max-steps: 6
+  temperature: 0.0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    # DEBUG — увидеть сырые запросы и ответы моделей.
+    ai.lab.broker.llm: INFO

@@ -1,0 +1,30 @@
+package ai.lab.broker.web;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.NoSuchElementException;
+
+/** Ошибки — в формате ProblemDetail (RFC 9457), без стектрейсов наружу. */
+@RestControllerAdvice
+class ApiExceptionHandler {
+
+    /** Заглушки скелета: «Задание N: …» — видно, что осталось сделать. */
+    @ExceptionHandler(UnsupportedOperationException.class)
+    ProblemDetail notImplemented(UnsupportedOperationException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, e.getMessage());
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    ProblemDetail notFound(NoSuchElementException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    /** Например, подтверждение заявки, которая уже не PENDING_CONFIRMATION, если решишь отвечать так. */
+    @ExceptionHandler(IllegalStateException.class)
+    ProblemDetail conflict(IllegalStateException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+}
