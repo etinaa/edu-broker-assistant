@@ -82,7 +82,10 @@ public class BrokerService {
         }
 
         Order order = createOrder(accountId, side, ticker, quantity, price);
-        return new OrderDecision.Created(order, account.getCash().subtract(total));
+        BigDecimal cashAfter = side == OrderSide.BUY
+                ? account.getCash().subtract(total)
+                : account.getCash().add(total);
+        return new OrderDecision.Created(order, cashAfter);
     }
 
     private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {

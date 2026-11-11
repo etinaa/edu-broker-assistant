@@ -89,6 +89,16 @@ class BrokerServiceTest {
     }
 
     @Test
+    void placeSellCashAfterIncreasesByOrderTotal() {
+        // 4 * 185.25 = 741.00 -> 10000.00 + 741.00
+        OrderDecision.Created created = assertInstanceOf(OrderDecision.Created.class,
+                service.placeOrder("BRK-1", OrderSide.SELL, "TRNC", 4));
+
+        assertMoney("10741.00", created.cashAfter());
+        assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
+    }
+
+    @Test
     void placeBuyWithExactlyAllCashIsAllowed() {
         // 100.00 cash, SMPL costs 12.30 -> 8 shares = 98.40; use TRNC-free exact case via BRK-1: 10000 / 410 not exact,
         // so verify boundary with DEMO: 24 * 410.00 = 9840.00 <= 10000, 25 * 410.00 = 10250.00 > 10000
