@@ -3,9 +3,7 @@ package ai.lab.broker.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -16,13 +14,8 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Claude через Messages API (POST /v1/messages). Перенесено из stage1-llm-basics и урезано до того, что нужно
- * агенту: запрос с инструментами. Ключ и цены приходят из конфигурации, а не из System.getenv.
- */
+@Slf4j
 public class ClaudeClient {
-
-    private static final Logger log = LoggerFactory.getLogger(ClaudeClient.class);
 
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
@@ -50,9 +43,12 @@ public class ClaudeClient {
      * Ответ на запрос с инструментами. content — блоки ответа как есть (text, tool_use): их целиком
      * нужно вернуть в историю assistant-сообщением, иначе tool_result не к чему будет привязать.
      */
-    public record ToolTurn(JsonNode content, LlmResponse response) {}
+    public record ToolTurn(JsonNode content, LlmResponse response) {
+    }
 
-    /** toolChoice — поле tool_choice как есть (auto/any/tool/none, disable_parallel_tool_use); null — не передавать. */
+    /**
+     * toolChoice — поле tool_choice как есть (auto/any/tool/none, disable_parallel_tool_use); null — не передавать.
+     */
     public ToolTurn chatWithTools(String system, ArrayNode messages, ArrayNode tools, JsonNode toolChoice,
                                   double temperature) throws Exception {
         Map<String, Object> body = new HashMap<>(Map.of(
@@ -102,7 +98,9 @@ public class ClaudeClient {
                 .build();
     }
 
-    /** content — массив блоков; текст собирается из блоков type=text. */
+    /**
+     * content — массив блоков; текст собирается из блоков type=text.
+     */
     private static String extractText(JsonNode contentBlocks) {
         StringBuilder text = new StringBuilder();
         for (JsonNode block : contentBlocks) {
@@ -114,9 +112,11 @@ public class ClaudeClient {
     }
 
     private String calculateCost(int inputTokens, int outputTokens) {
-        BigDecimal cost = BigDecimal.valueOf(inputTokens).multiply(inputPricePerMillion)
-                .add(BigDecimal.valueOf(outputTokens).multiply(outputPricePerMillion))
-                .divide(TOKENS_PER_MILLION);
-        return cost.toPlainString();
+        return BigDecimal.valueOf(inputTokens)
+                .multiply(inputPricePerMillion)
+                .add(BigDecimal.valueOf(outputTokens)
+                        .multiply(outputPricePerMillion))
+                .divide(TOKENS_PER_MILLION)
+                .toPlainString();
     }
 }

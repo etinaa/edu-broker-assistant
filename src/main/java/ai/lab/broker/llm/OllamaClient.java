@@ -3,9 +3,7 @@ package ai.lab.broker.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,9 +17,8 @@ import java.util.Map;
  * Локальная модель через Ollama (POST /api/chat). Перенесено из stage1-llm-basics и урезано до запроса с
  * инструментами; адрес сервера, модель и окно контекста — из конфигурации.
  */
+@Slf4j
 public class OllamaClient {
-
-    private static final Logger log = LoggerFactory.getLogger(OllamaClient.class);
 
     private static final String NO_COST = "0";
     private static final ObjectMapper JSON = new ObjectMapper();
