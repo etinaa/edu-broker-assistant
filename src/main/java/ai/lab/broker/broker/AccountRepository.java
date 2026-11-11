@@ -2,32 +2,41 @@ package ai.lab.broker.broker;
 
 import ai.lab.broker.domain.Account;
 
+import org.apache.commons.lang3.Strings;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Единственный счёт BRK-1 в памяти. Счёт определяет сервер, а не модель, поэтому accountId нет
- * ни в аргументах инструментов, ни здесь.
- */
 @Component
 public class AccountRepository {
 
-    private final AtomicReference<Account> account = new AtomicReference<>();
+    private final List<Account> accounts;
 
     public AccountRepository() {
-        reset();
+        accounts = new CopyOnWriteArrayList<>();
+
+        Account account1 = new Account("BRK-1", new BigDecimal("10000.00"),
+                Map.of("TRNC", 20L, "SMPB", 100L, "DEMO", 5L)
+        );
+        accounts.add(account1);
+
+        Account account2 = new Account("BRK-2", new BigDecimal("100.00"),
+                Map.of("SMPL", 10L)
+        );
+        accounts.add(account2);
     }
 
-    public Account get() {
-        return account.get();
+    public List<Account> all() {
+        return List.copyOf(accounts);
     }
 
-    public void save(Account updated) {
-        account.set(updated);
-    }
-
-    public void reset() {
-        account.set(DemoData.initialAccount());
+    public Optional<Account> byId(String id) {
+        return accounts.stream()
+                .filter(account -> Strings.CS.equals(account.getId(), id))
+                .findFirst();
     }
 }

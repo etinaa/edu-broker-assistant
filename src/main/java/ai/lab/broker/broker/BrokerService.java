@@ -1,14 +1,13 @@
 package ai.lab.broker.broker;
 
-import ai.lab.broker.domain.Account;
-import ai.lab.broker.domain.Order;
-import ai.lab.broker.domain.OrderDecision;
-import ai.lab.broker.domain.OrderSide;
-import ai.lab.broker.domain.SearchResult;
-import ai.lab.broker.domain.Security;
+import ai.lab.broker.domain.*;
 
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.Strings;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -18,39 +17,23 @@ import java.util.Optional;
  * Методы-заглушки бросают UnsupportedOperationException с номером задания — API отвечает на них 501.
  */
 @Service
+@RequiredArgsConstructor
 public class BrokerService {
 
-    private final SecurityCatalog catalog;
+    private final SecurityCatalog securities;
     private final AccountRepository accounts;
     private final OrderBook orders;
 
-    public BrokerService(SecurityCatalog catalog, AccountRepository accounts, OrderBook orders) {
-        this.catalog = catalog;
-        this.accounts = accounts;
-        this.orders = orders;
+    public Optional<BigDecimal> currentPriceByTicker(String ticker) {
+        return securities.byTicker(ticker).map(Security::currentPrice);
     }
 
-    /** Текущее состояние счёта. */
-    public Account account() {
-        return accounts.get();
+    public Optional<Account> accountById(String accountId) {
+        return accounts.byId(accountId);
     }
 
-    /**
-     * Задание 1. Поиск бумаги по тикеру, ISIN или названию:
-     * <ol>
-     *   <li>точный тикер или ISIN без учёта регистра → EXACT;</li>
-     *   <li>иначе по названию (нормализованная подстрока: регистр, лишние пробелы, точки):
-     *       одна бумага → EXACT, несколько → CANDIDATES;</li>
-     *   <li>ничего → NOT_FOUND. Пустой или null-запрос — тоже NOT_FOUND, а не исключение.</li>
-     * </ol>
-     */
-    public SearchResult findSecurity(String query) {
-        throw new UnsupportedOperationException("Задание 1: BrokerService.findSecurity");
-    }
-
-    /** Текущая цена по точному тикеру. */
-    public Optional<Security> quote(String ticker) {
-        return catalog.byTicker(ticker);
+    public Optional<Order> orderById(String orderId) {
+        return orders.byId(orderId);
     }
 
     /**
@@ -65,8 +48,48 @@ public class BrokerService {
      * Нецелое количество (2,5) отсекается раньше — при разборе аргументов инструмента (задание 5).
      * Подумай, учитывать ли в проверке баланса другие ожидающие заявки (задание 6а).
      */
-    public OrderDecision placeOrder(OrderSide side, String ticker, long quantity) {
-        throw new UnsupportedOperationException("Задание 1: BrokerService.placeOrder");
+    public OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
+        Optional<Account> optAccount = accountById(accountId);
+        if (optAccount.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Account with accountId = " + accountId + " not found");
+        }
+        if (quantity <= 0) {
+            return new OrderDecision.Refused(OrderDecision.Reason.INVALID_QUANTITY,
+                    "Quantity must be greater than 0");
+        }
+        Optional<Security> security = securities.byTicker(ticker);
+        if (security.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.UNKNOWN_SECURITY,
+                    "Security with ticker = " + ticker + " not found");
+        }
+
+        Account account = optAccount.get();
+        BigDecimal price = security.get().currentPrice();
+        BigDecimal total = BigDecimal.valueOf(quantity).multiply(price);
+        if (side == OrderSide.BUY) {
+            if (!account.enoughCash(total)) {
+                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_FUNDS,
+                        "Insufficient funds. Needed " + total + ". Available " + account.getCash());
+            }
+        }
+        if (side == OrderSide.SELL) {
+            Long amount = account.getPositions().getOrDefault(ticker, 0L);
+            if (!account.enoughQuantity(security.get().ticker(), quantity)) {
+                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_POSITION,
+                        "Insufficient securities. Needed " + quantity + ". Available " + amount);
+            }
+        }
+
+        Order order = createOrder(accountId, side, ticker, quantity, price);
+        return new OrderDecision.Created(order, account.getCash().subtract(total));
+    }
+
+    private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {
+        String orderId = orders.nextId();
+        Order order = new Order(orderId, accountId, side, ticker, quantity, price);
+        orders.add(order);
+        return order;
     }
 
     /**
@@ -74,16 +97,119 @@ public class BrokerService {
      * заново проверить деньги или позицию, при успехе изменить счёт и вернуть EXECUTED, при неуспехе — FAILED
      * с причиной. Повторный confirm не должен менять счёт второй раз.
      */
-    public Order confirm(String orderId) {
-        throw new UnsupportedOperationException("Задание 1: BrokerService.confirm");
+    public OrderDecision confirmOrder(String accountId, String orderId) {
+        Optional<Order> optOrder = orderById(orderId);
+        if (optOrder.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Order with orderId = " + orderId + " not found");
+        }
+
+        Order order = optOrder.get();
+        Optional<Account> optAccount = accountById(accountId);
+        if (optAccount.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Account with accountId = " + accountId + " not found");
+        }
+        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "OrderId = " + orderId + " not related to accountId = " + accountId);
+        }
+        Account account = optAccount.get();
+
+        if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Can't confirm order with status = " + order.getStatus());
+        }
+
+        BigDecimal price = currentPriceByTicker(order.getTicker()).orElse(BigDecimal.ZERO);
+        BigDecimal total = BigDecimal.valueOf(order.getQuantity()).multiply(price);
+
+        if (order.getSide() == OrderSide.BUY) {
+            BigDecimal cash = account.getCash();
+            if (total.compareTo(cash) > 0) {
+                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_FUNDS,
+                        "Insufficient funds. Needed " + total + ". Available " + cash);
+            }
+        }
+        if (order.getSide() == OrderSide.SELL) {
+            Long amount = account.getPositions().getOrDefault(order.getTicker(), 0L);
+            if (order.getQuantity() > amount) {
+                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_POSITION,
+                        "Insufficient securities. Needed " + order.getQuantity() + ". Available " + amount);
+            }
+        }
+
+        Order executedOrder = executeOrder(account, order);
+        return new OrderDecision.Confirmed(executedOrder);
+    }
+
+    private Order executeOrder(Account account, Order order) {
+        order.setStatus(OrderStatus.EXECUTED, "Order confirmed");
+        String ticker = order.getTicker();
+        BigDecimal price = currentPriceByTicker(ticker).orElse(BigDecimal.ZERO);
+        if (order.getSide() == OrderSide.BUY) {
+            account.add(ticker, order.getQuantity(), price);
+        }
+        if (order.getSide() == OrderSide.SELL) {
+            account.subtract(ticker, order.getQuantity(), price);
+        }
+        return order;
     }
 
     /** Задание 1. Отказ от заявки: PENDING_CONFIRMATION → REJECTED_BY_USER, остальные статусы не меняются. */
-    public Order reject(String orderId) {
-        throw new UnsupportedOperationException("Задание 1: BrokerService.reject");
+    public OrderDecision rejectOrder(String accountId, String orderId) {
+        Optional<Order> optOrder = orderById(orderId);
+        if (optOrder.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Order with orderId = " + orderId + " not found");
+        }
+
+        Order order = optOrder.get();
+        Optional<Account> optAccount = accountById(accountId);
+        if (optAccount.isEmpty()) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Account with accountId = " + accountId + " not found");
+        }
+        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "OrderId = " + orderId + " not related to accountId = " + accountId);
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
+            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
+                    "Can't reject order with status = " + order.getStatus());
+        }
+
+        Order canceledOrder = cancelOrder(order);
+        return new OrderDecision.Rejected(canceledOrder);
     }
 
-    public Optional<Order> order(String orderId) {
-        return orders.find(orderId);
+    private Order cancelOrder(Order order) {
+        order.setStatus(OrderStatus.REJECTED_BY_USER, "Order cancelled by user");
+        return order;
+    }
+
+    /**
+     * Задание 1. Поиск бумаги по тикеру, ISIN или названию:
+     * <ol>
+     *   <li>точный тикер или ISIN без учёта регистра → EXACT;</li>
+     *   <li>иначе по названию (нормализованная подстрока: регистр, лишние пробелы, точки):
+     *       одна бумага → EXACT, несколько → CANDIDATES;</li>
+     *   <li>ничего → NOT_FOUND. Пустой или null-запрос — тоже NOT_FOUND, а не исключение.</li>
+     * </ol>
+     */
+    public SearchResult findSecurity(String query) {
+        List<Security> securityList = securities.all().stream()
+                .filter(security -> Strings.CI.contains(security.isin(), query)
+                        || Strings.CI.contains(security.ticker(), query)
+                        || Strings.CI.contains(security.name(), query))
+                .toList();
+        if (securityList.isEmpty()) {
+            return SearchResult.notFound();
+        } else if (securityList.size() == 1) {
+            return SearchResult.exact(securityList.getFirst());
+        } else {
+            return SearchResult.candidates(securityList);
+        }
     }
 }

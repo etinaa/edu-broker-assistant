@@ -14,5 +14,9 @@ public sealed interface OrderDecision {
     /** message — человекочитаемая причина с цифрами, например «нужно 12 300.00 USD, на счёте 10 000.00 USD». */
     record Refused(Reason reason, String message) implements OrderDecision {}
 
-    enum Reason { INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY }
+    record Confirmed(Order order) implements OrderDecision {}
+
+    record Rejected(Order order) implements OrderDecision {}
+
+    enum Reason { ILLEGAL_ACCESS, INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY }
 }

@@ -20,7 +20,8 @@ class AccountController {
 
     @GetMapping("/account")
     Account account() {
-        return broker.account();
+        //return broker.account();
+        return null;
     }
 
     @GetMapping("/securities/search")

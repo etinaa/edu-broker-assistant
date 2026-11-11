@@ -19,10 +19,10 @@ public record ChatResponse(String answer, PendingOrder pendingOrder, List<Securi
     public record PendingOrder(String orderId, OrderSide side, String ticker, long quantity,
                                BigDecimal price, BigDecimal total, BigDecimal cashAfter, OrderStatus status) {
 
-        public static PendingOrder from(OrderDecision.Created created) {
+        /*public static PendingOrder from(OrderDecision.Created created) {
             var o = created.order();
             return new PendingOrder(o.id(), o.side(), o.ticker(), o.quantity(), o.price(), o.total(),
                     created.cashAfter(), o.status());
-        }
+        }*/
     }
 }

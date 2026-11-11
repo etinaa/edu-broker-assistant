@@ -31,9 +31,9 @@ class AdminController {
 
     @PostMapping("/admin/reset")
     ResponseEntity<Void> reset() {
-        catalog.reset();
-        accounts.reset();
-        orders.reset();
+        //catalog.reset();
+        //accounts.reset();
+        //orders.reset();
         sessions.clear();
         traces.clear();
         return ResponseEntity.noContent().build();

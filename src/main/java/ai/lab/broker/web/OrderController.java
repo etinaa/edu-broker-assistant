@@ -27,16 +27,18 @@ class OrderController {
 
     @GetMapping("/{id}")
     Order order(@PathVariable String id) {
-        return broker.order(id).orElseThrow(() -> new NoSuchElementException("Заявка " + id + " не найдена"));
+        return broker.orderById(id).orElseThrow(() -> new NoSuchElementException("Заявка " + id + " не найдена"));
     }
 
     @PostMapping("/{id}/confirm")
     Order confirm(@PathVariable String id) {
-        return broker.confirm(id);
+        //return broker.confirmOrder(id);
+        return null;
     }
 
     @PostMapping("/{id}/reject")
     Order reject(@PathVariable String id) {
-        return broker.reject(id);
+        //return broker.reject(id);
+        return null;
     }
 }
