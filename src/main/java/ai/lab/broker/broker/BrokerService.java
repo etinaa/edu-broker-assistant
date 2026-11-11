@@ -51,17 +51,14 @@ public class BrokerService {
     public OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Account with accountId = " + accountId + " not found");
+            return OrderDecision.Refused.accountNotFound(accountId);
         }
         if (quantity <= 0) {
-            return new OrderDecision.Refused(OrderDecision.Reason.INVALID_QUANTITY,
-                    "Quantity must be greater than 0");
+            return OrderDecision.Refused.invalidQuantity();
         }
         Optional<Security> optSecurity = securities.byTicker(ticker);
         if (optSecurity.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.UNKNOWN_SECURITY,
-                    "Security with ticker = " + ticker + " not found");
+            return OrderDecision.Refused.unknownSecurity(ticker);
         }
 
         Account account = optAccount.get();
@@ -69,15 +66,13 @@ public class BrokerService {
         BigDecimal total = BigDecimal.valueOf(quantity).multiply(security.currentPrice());
         if (side == OrderSide.BUY) {
             if (!account.enoughCash(total)) {
-                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_FUNDS,
-                        "Insufficient funds. Needed " + total + ". Available " + account.getCash());
+                return OrderDecision.Refused.insufficientFunds(total, account.getCash());
             }
         }
         if (side == OrderSide.SELL) {
-            long amount = account.quantityByTicker(security.ticker());
             if (!account.enoughQuantity(security.ticker(), quantity)) {
-                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_POSITION,
-                        "Insufficient securities. Needed " + quantity + ". Available " + amount);
+                return OrderDecision.Refused.insufficientPosition(quantity,
+                        account.quantityByTicker(security.ticker()));
             }
         }
 
@@ -103,25 +98,21 @@ public class BrokerService {
     public OrderDecision confirmOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
         if (optOrder.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Order with orderId = " + orderId + " not found");
+            return OrderDecision.Refused.orderNotFound(orderId);
         }
 
         Order order = optOrder.get();
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Account with accountId = " + accountId + " not found");
+            return OrderDecision.Refused.accountNotFound(accountId);
         }
         if (!Strings.CS.equals(order.getAccountId(), accountId)) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "OrderId = " + orderId + " not related to accountId = " + accountId);
+            return OrderDecision.Refused.orderNotOwned(orderId, accountId);
         }
         Account account = optAccount.get();
 
         if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Can't confirm order with status = " + order.getStatus());
+            return OrderDecision.Refused.cannotConfirm(order.getStatus());
         }
 
         BigDecimal price = currentPriceByTicker(order.getTicker()).orElse(BigDecimal.ZERO);
@@ -130,15 +121,13 @@ public class BrokerService {
         if (order.getSide() == OrderSide.BUY) {
             BigDecimal cash = account.getCash();
             if (total.compareTo(cash) > 0) {
-                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_FUNDS,
-                        "Insufficient funds. Needed " + total + ". Available " + cash);
+                return OrderDecision.Refused.insufficientFunds(total, cash);
             }
         }
         if (order.getSide() == OrderSide.SELL) {
-            Long amount = account.getPositions().getOrDefault(order.getTicker(), 0L);
+            long amount = account.quantityByTicker(order.getTicker());
             if (order.getQuantity() > amount) {
-                return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_POSITION,
-                        "Insufficient securities. Needed " + order.getQuantity() + ". Available " + amount);
+                return OrderDecision.Refused.insufficientPosition(order.getQuantity(), amount);
             }
         }
 
@@ -163,24 +152,20 @@ public class BrokerService {
     public OrderDecision rejectOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
         if (optOrder.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Order with orderId = " + orderId + " not found");
+            return OrderDecision.Refused.orderNotFound(orderId);
         }
 
         Order order = optOrder.get();
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Account with accountId = " + accountId + " not found");
+            return OrderDecision.Refused.accountNotFound(accountId);
         }
         if (!Strings.CS.equals(order.getAccountId(), accountId)) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "OrderId = " + orderId + " not related to accountId = " + accountId);
+            return OrderDecision.Refused.orderNotOwned(orderId, accountId);
         }
 
         if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
-            return new OrderDecision.Refused(OrderDecision.Reason.ILLEGAL_ACCESS,
-                    "Can't reject order with status = " + order.getStatus());
+            return OrderDecision.Refused.cannotReject(order.getStatus());
         }
 
         Order canceledOrder = cancelOrder(order);

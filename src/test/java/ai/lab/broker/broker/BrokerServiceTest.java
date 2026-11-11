@@ -39,6 +39,10 @@ class BrokerServiceTest {
         return assertInstanceOf(OrderDecision.Refused.class, d).reason();
     }
 
+    private static String refusedMessage(OrderDecision d) {
+        return assertInstanceOf(OrderDecision.Refused.class, d).message();
+    }
+
     // ---- lookups ----
 
     @Test
@@ -119,7 +123,7 @@ class BrokerServiceTest {
     void sellWithLowercaseTickerUsesExistingPosition() {
         OrderDecision.Refused refused = assertInstanceOf(OrderDecision.Refused.class,
                 service.placeOrder("BRK-1", OrderSide.SELL, "trnc", 21));
-        assertTrue(refused.message().contains("Available 20"), refused.message());
+        assertMoney("20", refused.available());
 
         Order order = placeOk("BRK-1", OrderSide.SELL, "trnc", 20);
         assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
@@ -147,6 +151,42 @@ class BrokerServiceTest {
     }
 
     @Test
+    void placeBuyRefusalReportsShortfall() {
+        // 30 * 410.00 = 12300.00 needed, 10000.00 available -> short by 2300.00
+        OrderDecision.Refused refused = assertInstanceOf(OrderDecision.Refused.class,
+                service.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 30));
+
+        assertEquals(Reason.INSUFFICIENT_FUNDS, refused.reason());
+        assertMoney("12300.00", refused.needed());
+        assertMoney("10000.00", refused.available());
+        assertMoney("2300.00", refused.shortfall());
+        assertEquals("Insufficient funds: needed 12300.00 USD, available 10000.00 USD, short by 2300.00 USD",
+                refused.message());
+    }
+
+    @Test
+    void placeSellRefusalReportsShortfall() {
+        OrderDecision.Refused refused = assertInstanceOf(OrderDecision.Refused.class,
+                service.placeOrder("BRK-1", OrderSide.SELL, "TRNC", 50));
+
+        assertEquals(Reason.INSUFFICIENT_POSITION, refused.reason());
+        assertMoney("50", refused.needed());
+        assertMoney("20", refused.available());
+        assertMoney("30", refused.shortfall());
+        assertEquals("Insufficient securities: needed 50, available 20, short by 30", refused.message());
+    }
+
+    @Test
+    void refusalsWithoutNumbersHaveNoAmounts() {
+        OrderDecision.Refused refused = assertInstanceOf(OrderDecision.Refused.class,
+                service.placeOrder("BRK-1", OrderSide.BUY, "NOPE", 1));
+
+        assertNull(refused.needed());
+        assertNull(refused.available());
+        assertNull(refused.shortfall());
+    }
+
+    @Test
     void placeSellRefusedWhenQuantityExceedsPosition() {
         OrderDecision d = service.placeOrder("BRK-1", OrderSide.SELL, "TRNC", 21);
 
@@ -164,19 +204,29 @@ class BrokerServiceTest {
 
     @Test
     void placeRefusedForNonPositiveQuantity() {
-        assertEquals(Reason.INVALID_QUANTITY, refusedReason(service.placeOrder("BRK-1", OrderSide.BUY, "TRNC", 0)));
-        assertEquals(Reason.INVALID_QUANTITY, refusedReason(service.placeOrder("BRK-1", OrderSide.SELL, "TRNC", -5)));
+        OrderDecision zero = service.placeOrder("BRK-1", OrderSide.BUY, "TRNC", 0);
+        OrderDecision negative = service.placeOrder("BRK-1", OrderSide.SELL, "TRNC", -5);
+
+        assertEquals(Reason.INVALID_QUANTITY, refusedReason(zero));
+        assertEquals(Reason.INVALID_QUANTITY, refusedReason(negative));
+        assertEquals("Quantity must be greater than 0", refusedMessage(zero));
         assertTrue(orders.all().isEmpty());
     }
 
     @Test
     void placeRefusedForUnknownTicker() {
-        assertEquals(Reason.UNKNOWN_SECURITY, refusedReason(service.placeOrder("BRK-1", OrderSide.BUY, "NOPE", 1)));
+        OrderDecision d = service.placeOrder("BRK-1", OrderSide.BUY, "NOPE", 1);
+
+        assertEquals(Reason.UNKNOWN_SECURITY, refusedReason(d));
+        assertEquals("Security with ticker = NOPE not found", refusedMessage(d));
     }
 
     @Test
     void placeRefusedForUnknownAccount() {
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.placeOrder("nope", OrderSide.BUY, "TRNC", 1)));
+        OrderDecision d = service.placeOrder("nope", OrderSide.BUY, "TRNC", 1);
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Account with accountId = nope not found", refusedMessage(d));
     }
 
     @Test
@@ -221,6 +271,7 @@ class BrokerServiceTest {
         OrderDecision second = service.confirmOrder("BRK-1", order.getId());
 
         assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(second));
+        assertEquals("Can't confirm order with status = EXECUTED", refusedMessage(second));
         Account account = service.accountById("BRK-1").orElseThrow();
         assertMoney("8147.50", account.getCash());
         assertEquals(30L, account.quantityByTicker("TRNC"));
@@ -236,6 +287,8 @@ class BrokerServiceTest {
         OrderDecision d = service.confirmOrder("BRK-2", second.getId());
 
         assertEquals(Reason.INSUFFICIENT_FUNDS, refusedReason(d));
+        // 98.40 needed, 1.60 left after the first order -> short by 96.80
+        assertMoney("96.80", ((OrderDecision.Refused) d).shortfall());
         Account account = service.accountById("BRK-2").orElseThrow();
         assertMoney("1.60", account.getCash());
         assertEquals(18L, account.quantityByTicker("SMPL"));
@@ -256,13 +309,20 @@ class BrokerServiceTest {
 
     @Test
     void confirmRefusedForUnknownOrder() {
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.confirmOrder("BRK-1", "ORD-999")));
+        OrderDecision d = service.confirmOrder("BRK-1", "ORD-999");
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Order with orderId = ORD-999 not found", refusedMessage(d));
     }
 
     @Test
     void confirmRefusedForUnknownAccount() {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.confirmOrder("nope", order.getId())));
+
+        OrderDecision d = service.confirmOrder("nope", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Account with accountId = nope not found", refusedMessage(d));
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
     }
 
@@ -270,7 +330,10 @@ class BrokerServiceTest {
     void confirmRefusedForForeignAccountAndNothingChanges() {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.confirmOrder("BRK-2", order.getId())));
+        OrderDecision d = service.confirmOrder("BRK-2", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("OrderId = " + order.getId() + " not related to accountId = BRK-2", refusedMessage(d));
 
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
@@ -282,7 +345,10 @@ class BrokerServiceTest {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
         service.rejectOrder("BRK-1", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.confirmOrder("BRK-1", order.getId())));
+        OrderDecision d = service.confirmOrder("BRK-1", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Can't confirm order with status = REJECTED_BY_USER", refusedMessage(d));
         assertEquals(OrderStatus.REJECTED_BY_USER, order.getStatus());
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
     }
@@ -307,7 +373,10 @@ class BrokerServiceTest {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
         service.confirmOrder("BRK-1", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.rejectOrder("BRK-1", order.getId())));
+        OrderDecision d = service.rejectOrder("BRK-1", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Can't reject order with status = EXECUTED", refusedMessage(d));
         assertEquals(OrderStatus.EXECUTED, order.getStatus());
     }
 
@@ -316,16 +385,27 @@ class BrokerServiceTest {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
         service.rejectOrder("BRK-1", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.rejectOrder("BRK-1", order.getId())));
+        OrderDecision d = service.rejectOrder("BRK-1", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
+        assertEquals("Can't reject order with status = REJECTED_BY_USER", refusedMessage(d));
     }
 
     @Test
     void rejectRefusedForUnknownOrderUnknownAccountAndForeignAccount() {
         Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.rejectOrder("BRK-1", "ORD-999")));
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.rejectOrder("nope", order.getId())));
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(service.rejectOrder("BRK-2", order.getId())));
+        OrderDecision unknownOrder = service.rejectOrder("BRK-1", "ORD-999");
+        OrderDecision unknownAccount = service.rejectOrder("nope", order.getId());
+        OrderDecision foreignAccount = service.rejectOrder("BRK-2", order.getId());
+
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(unknownOrder));
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(unknownAccount));
+        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(foreignAccount));
+        assertEquals("Order with orderId = ORD-999 not found", refusedMessage(unknownOrder));
+        assertEquals("Account with accountId = nope not found", refusedMessage(unknownAccount));
+        assertEquals("OrderId = " + order.getId() + " not related to accountId = BRK-2",
+                refusedMessage(foreignAccount));
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
     }
 
