@@ -58,15 +58,15 @@ public class BrokerService {
             return new OrderDecision.Refused(OrderDecision.Reason.INVALID_QUANTITY,
                     "Quantity must be greater than 0");
         }
-        Optional<Security> security = securities.byTicker(ticker);
-        if (security.isEmpty()) {
+        Optional<Security> optSecurity = securities.byTicker(ticker);
+        if (optSecurity.isEmpty()) {
             return new OrderDecision.Refused(OrderDecision.Reason.UNKNOWN_SECURITY,
                     "Security with ticker = " + ticker + " not found");
         }
 
         Account account = optAccount.get();
-        BigDecimal price = security.get().currentPrice();
-        BigDecimal total = BigDecimal.valueOf(quantity).multiply(price);
+        Security security = optSecurity.get();
+        BigDecimal total = BigDecimal.valueOf(quantity).multiply(security.currentPrice());
         if (side == OrderSide.BUY) {
             if (!account.enoughCash(total)) {
                 return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_FUNDS,
@@ -74,14 +74,14 @@ public class BrokerService {
             }
         }
         if (side == OrderSide.SELL) {
-            Long amount = account.getPositions().getOrDefault(ticker, 0L);
-            if (!account.enoughQuantity(security.get().ticker(), quantity)) {
+            long amount = account.quantityByTicker(security.ticker());
+            if (!account.enoughQuantity(security.ticker(), quantity)) {
                 return new OrderDecision.Refused(OrderDecision.Reason.INSUFFICIENT_POSITION,
                         "Insufficient securities. Needed " + quantity + ". Available " + amount);
             }
         }
 
-        Order order = createOrder(accountId, side, ticker, quantity, price);
+        Order order = createOrder(accountId, side, security.ticker(), quantity, security.currentPrice());
         BigDecimal cashAfter = side == OrderSide.BUY
                 ? account.getCash().subtract(total)
                 : account.getCash().add(total);

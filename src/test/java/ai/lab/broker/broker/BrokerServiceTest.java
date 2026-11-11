@@ -99,6 +99,34 @@ class BrokerServiceTest {
     }
 
     @Test
+    void orderStoresCanonicalTickerRegardlessOfInputCase() {
+        assertEquals("DEMO", placeOk("BRK-1", OrderSide.BUY, "demo", 1).getTicker());
+        assertEquals("TRNC", placeOk("BRK-1", OrderSide.SELL, "tRnC", 1).getTicker());
+    }
+
+    @Test
+    void buyWithLowercaseTickerAddsToExistingPosition() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "demo", 10);
+
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
+
+        Account account = service.accountById("BRK-1").orElseThrow();
+        assertEquals(15L, account.quantityByTicker("DEMO"));
+        assertFalse(account.getPositions().containsKey("demo"));
+    }
+
+    @Test
+    void sellWithLowercaseTickerUsesExistingPosition() {
+        OrderDecision.Refused refused = assertInstanceOf(OrderDecision.Refused.class,
+                service.placeOrder("BRK-1", OrderSide.SELL, "trnc", 21));
+        assertTrue(refused.message().contains("Available 20"), refused.message());
+
+        Order order = placeOk("BRK-1", OrderSide.SELL, "trnc", 20);
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
+        assertEquals(0L, service.accountById("BRK-1").orElseThrow().quantityByTicker("TRNC"));
+    }
+
+    @Test
     void placeBuyWithExactlyAllCashIsAllowed() {
         // 100.00 cash, SMPL costs 12.30 -> 8 shares = 98.40; use TRNC-free exact case via BRK-1: 10000 / 410 not exact,
         // so verify boundary with DEMO: 24 * 410.00 = 9840.00 <= 10000, 25 * 410.00 = 10250.00 > 10000
