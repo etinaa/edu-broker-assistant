@@ -8,13 +8,12 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Все денежные правила — здесь, на BigDecimal, без LLM. Модель только понимает намерение и подбирает
- * аргументы; решает этот класс. Каждое правило должно быть покрыто юнит-тестом (задание 1).
- * <p>
- * Методы-заглушки бросают UnsupportedOperationException с номером задания — API отвечает на них 501.
+ * All money rules live here, on BigDecimal, with no LLM involved. The model only understands the intent and
+ * picks the arguments; this class makes the decisions. Every rule must be covered by a unit test (task 1).
  */
 @Service
 @RequiredArgsConstructor
@@ -37,16 +36,16 @@ public class BrokerService {
     }
 
     /**
-     * Задание 1. Создать заявку, ожидающую подтверждения. Деньги и бумаги НЕ двигаются.
+     * Task 1. Create an order that waits for confirmation. Money and securities are NOT moved.
      * <ul>
      *   <li>quantity ≤ 0 → Refused(INVALID_QUANTITY);</li>
-     *   <li>неизвестный тикер → Refused(UNKNOWN_SECURITY);</li>
-     *   <li>BUY: total = price × quantity; total &gt; cash → Refused(INSUFFICIENT_FUNDS) с суммой нехватки;</li>
-     *   <li>SELL: quantity &gt; позиции → Refused(INSUFFICIENT_POSITION) с тем, сколько есть;</li>
-     *   <li>иначе — Order(PENDING_CONFIRMATION) в {@link OrderBook} и Created с cashAfter.</li>
+     *   <li>unknown ticker → Refused(UNKNOWN_SECURITY);</li>
+     *   <li>BUY: total = price × quantity; total &gt; cash → Refused(INSUFFICIENT_FUNDS) with the shortfall;</li>
+     *   <li>SELL: quantity &gt; position → Refused(INSUFFICIENT_POSITION) with how many are available;</li>
+     *   <li>otherwise — Order(PENDING_CONFIRMATION) in the {@link OrderBook} and Created with cashAfter.</li>
      * </ul>
-     * Нецелое количество (2,5) отсекается раньше — при разборе аргументов инструмента (задание 5).
-     * Подумай, учитывать ли в проверке баланса другие ожидающие заявки (задание 6а).
+     * A non-integer quantity (2.5) is rejected earlier, when the tool arguments are parsed (task 5).
+     * Think about whether the balance check should account for other pending orders (task 6a).
      */
     public OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
         Optional<Account> optAccount = accountById(accountId);
@@ -91,9 +90,9 @@ public class BrokerService {
     }
 
     /**
-     * Задание 1 (базовое исполнение) и задание 6 (повторные проверки). Только для PENDING_CONFIRMATION:
-     * заново проверить деньги или позицию, при успехе изменить счёт и вернуть EXECUTED, при неуспехе — FAILED
-     * с причиной. Повторный confirm не должен менять счёт второй раз.
+     * Task 1 (basic execution) and task 6 (repeated checks). Only for PENDING_CONFIRMATION:
+     * re-check the cash or the position; on success update the account and return EXECUTED, on failure — FAILED
+     * with the reason. A repeated confirm must not change the account a second time.
      */
     public OrderDecision confirmOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
@@ -148,7 +147,7 @@ public class BrokerService {
         return order;
     }
 
-    /** Задание 1. Отказ от заявки: PENDING_CONFIRMATION → REJECTED_BY_USER, остальные статусы не меняются. */
+    /** Task 1. Reject an order: PENDING_CONFIRMATION → REJECTED_BY_USER, other statuses are left unchanged. */
     public OrderDecision rejectOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
         if (optOrder.isEmpty()) {
@@ -178,26 +177,51 @@ public class BrokerService {
     }
 
     /**
-     * Задание 1. Поиск бумаги по тикеру, ISIN или названию:
+     * Task 1. Find a security by ticker, ISIN or name:
      * <ol>
-     *   <li>точный тикер или ISIN без учёта регистра → EXACT;</li>
-     *   <li>иначе по названию (нормализованная подстрока: регистр, лишние пробелы, точки):
-     *       одна бумага → EXACT, несколько → CANDIDATES;</li>
-     *   <li>ничего → NOT_FOUND. Пустой или null-запрос — тоже NOT_FOUND, а не исключение.</li>
+     *   <li>exact ticker or ISIN, case-insensitive → EXACT;</li>
+     *   <li>otherwise by name (normalized substring: case, extra spaces, dots):
+     *       one security → EXACT, several → CANDIDATES;</li>
+     *   <li>nothing → NOT_FOUND. An empty or null query is also NOT_FOUND, not an exception.</li>
      * </ol>
      */
     public SearchResult findSecurity(String query) {
-        List<Security> securityList = securities.all().stream()
-                .filter(security -> Strings.CI.contains(security.isin(), query)
-                        || Strings.CI.contains(security.ticker(), query)
-                        || Strings.CI.contains(security.name(), query))
-                .toList();
-        if (securityList.isEmpty()) {
+        if (query == null || query.isBlank()) {
             return SearchResult.notFound();
-        } else if (securityList.size() == 1) {
-            return SearchResult.exact(securityList.getFirst());
-        } else {
-            return SearchResult.candidates(securityList);
         }
+        List<Security> all = securities.all();
+
+        // 1. An exact ticker or ISIN identifies the security at once, even if other names would also match.
+        String code = query.strip();
+        Optional<Security> byCode = all.stream()
+                .filter(security -> Strings.CI.equals(security.ticker(), code)
+                        || Strings.CI.equals(security.isin(), code))
+                .findFirst();
+        if (byCode.isPresent()) {
+            return SearchResult.exact(byCode.get());
+        }
+
+        // 2. Otherwise — a substring of the name after normalization.
+        String normalizedQuery = normalizeName(query);
+        if (normalizedQuery.isEmpty()) {
+            return SearchResult.notFound();
+        }
+        List<Security> byName = all.stream()
+                .filter(security -> normalizeName(security.name()).contains(normalizedQuery))
+                .toList();
+
+        // 3. Nothing → NOT_FOUND, one security → EXACT, several → CANDIDATES.
+        if (byName.isEmpty()) {
+            return SearchResult.notFound();
+        } else if (byName.size() == 1) {
+            return SearchResult.exact(byName.getFirst());
+        } else {
+            return SearchResult.candidates(byName);
+        }
+    }
+
+    /** Case, dots and extra spaces do not affect the name search: "Sample  Logistics Ltd." ≡ "sample logistics ltd". */
+    private static String normalizeName(String name) {
+        return name.toLowerCase(Locale.ROOT).replace('.', ' ').trim().replaceAll("\\s+", " ");
     }
 }

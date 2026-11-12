@@ -469,4 +469,80 @@ class BrokerServiceTest {
     void findWithNullQueryReturnsNotFound() {
         assertEquals(Match.NOT_FOUND, service.findSecurity(null).match());
     }
+
+    @Test
+    void findWithEmptyOrBlankQueryReturnsNotFound() {
+        for (String query : new String[]{"", "   ", "\t", ".", " . . "}) {
+            SearchResult r = service.findSecurity(query);
+            assertEquals(Match.NOT_FOUND, r.match(), "query: '" + query + "'");
+            assertTrue(r.securities().isEmpty());
+        }
+    }
+
+    @Test
+    void findByIsinIsCaseInsensitiveAndTrimmed() {
+        SearchResult r = service.findSecurity("  us0000trnp02 ");
+
+        assertEquals(Match.EXACT, r.match());
+        assertEquals("TRNP", r.securities().getFirst().ticker());
+    }
+
+    @Test
+    void findDoesNotMatchPartialTickerOrIsin() {
+        assertEquals(Match.NOT_FOUND, service.findSecurity("TRN").match());
+        assertEquals(Match.NOT_FOUND, service.findSecurity("0000").match());
+        assertEquals(Match.NOT_FOUND, service.findSecurity("US0000TRN").match());
+    }
+
+    @Test
+    void findNormalizesCaseSpacesAndDotsInName() {
+        SearchResult spaces = service.findSecurity("  sample   LOGISTICS  ltd. ");
+        assertEquals(Match.EXACT, spaces.match());
+        assertEquals("SMPL", spaces.securities().getFirst().ticker());
+
+        SearchResult dotInQuery = service.findSecurity("Sample Logistics Ltd");
+        assertEquals(Match.EXACT, dotInQuery.match());
+        assertEquals("SMPL", dotInQuery.securities().getFirst().ticker());
+
+        SearchResult dotAcrossWords = service.findSecurity("corp common");
+        assertEquals(Match.EXACT, dotAcrossWords.match());
+        assertEquals("TRNC", dotAcrossWords.securities().getFirst().ticker());
+    }
+
+    @Test
+    void findByTrainingReturnsThreeCandidates() {
+        SearchResult r = service.findSecurity("Training");
+
+        assertEquals(Match.CANDIDATES, r.match());
+        assertEquals(java.util.List.of("TRNC", "TRNP", "TREN"),
+                r.securities().stream().map(Security::ticker).toList());
+    }
+
+    @Test
+    void findBySampleBankIsSingleMatch() {
+        SearchResult r = service.findSecurity("Sample Bank");
+
+        assertEquals(Match.EXACT, r.match());
+        assertEquals("SMPB", r.securities().getFirst().ticker());
+    }
+
+    @Test
+    void findExactTickerWinsOverNameCandidates() {
+        Security alpha = new Security("TEST", "XX0000000001", "Test Alpha Inc.", new BigDecimal("1.00"));
+        Security beta = new Security("TSTB", "XX0000000002", "Test Beta Inc.", new BigDecimal("2.00"));
+        SecurityCatalog catalog = new SecurityCatalog() {
+            @Override
+            public java.util.List<Security> all() {
+                return java.util.List.of(alpha, beta);
+            }
+        };
+        BrokerService custom = new BrokerService(catalog, new AccountRepository(), new OrderBook());
+
+        SearchResult byTicker = custom.findSecurity("test");
+        assertEquals(Match.EXACT, byTicker.match());
+        assertSame(alpha, byTicker.securities().getFirst());
+
+        // а по общей части названия, которая не тикер, остаются оба кандидата
+        assertEquals(Match.CANDIDATES, custom.findSecurity("Inc").match());
+    }
 }
