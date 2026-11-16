@@ -7,6 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,6 +47,67 @@ class BrokerServiceTest {
 
     private static String refusedMessage(OrderDecision d) {
         return assertInstanceOf(OrderDecision.Refused.class, d).message();
+    }
+
+    // ---- concurrency ----
+
+    /** Runs all tasks at the same moment on separate threads and returns their results. */
+    private static List<OrderDecision> runConcurrently(List<java.util.function.Supplier<OrderDecision>> tasks)
+            throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<OrderDecision>> futures = new ArrayList<>();
+            for (var task : tasks) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return task.get();
+                }));
+            }
+            start.countDown();
+            List<OrderDecision> results = new ArrayList<>();
+            for (Future<OrderDecision> f : futures) {
+                results.add(f.get());
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void parallelConfirmsOfSameOrderExecuteItOnce() throws Exception {
+        for (int round = 0; round < 50; round++) {
+            setUp();
+            Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 10);
+
+            List<OrderDecision> results = runConcurrently(java.util.Collections.nCopies(16,
+                    () -> service.confirmOrder("BRK-1", order.getId())));
+
+            assertEquals(1, results.stream().filter(OrderDecision.Confirmed.class::isInstance).count());
+            Account account = service.accountById("BRK-1").orElseThrow();
+            assertMoney("8147.50", account.getCash());
+            assertEquals(30L, account.quantityByTicker("TRNC"));
+        }
+    }
+
+    @Test
+    void parallelConfirmsOfTwoOrdersCannotOverspendCash() throws Exception {
+        for (int round = 0; round < 50; round++) {
+            setUp();
+            // BRK-2 cash 100.00: two orders of 98.40 each pass at placement, only one can be executed.
+            Order first = placeOk("BRK-2", OrderSide.BUY, "SMPL", 8);
+            Order second = placeOk("BRK-2", OrderSide.BUY, "SMPL", 8);
+
+            List<OrderDecision> results = runConcurrently(List.of(
+                    () -> service.confirmOrder("BRK-2", first.getId()),
+                    () -> service.confirmOrder("BRK-2", second.getId())));
+
+            assertEquals(1, results.stream().filter(OrderDecision.Confirmed.class::isInstance).count());
+            Account account = service.accountById("BRK-2").orElseThrow();
+            assertMoney("1.60", account.getCash());
+            assertEquals(18L, account.quantityByTicker("SMPL"));
+        }
     }
 
     // ---- lookups ----

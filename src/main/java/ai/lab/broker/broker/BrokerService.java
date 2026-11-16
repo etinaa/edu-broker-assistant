@@ -14,6 +14,10 @@ import java.util.Optional;
 /**
  * All money rules live here, on BigDecimal, with no LLM involved. The model only understands the intent and
  * picks the arguments; this class makes the decisions. Every rule must be covered by a unit test (task 1).
+ * <p>
+ * Thread safety (task 6): methods that read and then change an order or an account are {@code synchronized}, so a
+ * check ("status is PENDING", "enough cash") and the change that follows it cannot interleave with another request.
+ * One lock for the whole service is enough for this in-memory demo; with a database it would be a lock per account.
  */
 @Service
 @RequiredArgsConstructor
@@ -47,7 +51,7 @@ public class BrokerService {
      * A non-integer quantity (2.5) is rejected earlier, when the tool arguments are parsed (task 5).
      * Think about whether the balance check should account for other pending orders (task 6a).
      */
-    public OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
+    public synchronized OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
@@ -94,7 +98,7 @@ public class BrokerService {
      * re-check the cash or the position; on success update the account and return EXECUTED, on failure — FAILED
      * with the reason. A repeated confirm must not change the account a second time.
      */
-    public OrderDecision confirmOrder(String accountId, String orderId) {
+    public synchronized OrderDecision confirmOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
         if (optOrder.isEmpty()) {
             return OrderDecision.Refused.orderNotFound(orderId);
@@ -142,7 +146,7 @@ public class BrokerService {
     }
 
     /** Task 1. Reject an order: PENDING_CONFIRMATION → REJECTED_BY_USER, other statuses are left unchanged. */
-    public OrderDecision rejectOrder(String accountId, String orderId) {
+    public synchronized OrderDecision rejectOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);
         if (optOrder.isEmpty()) {
             return OrderDecision.Refused.orderNotFound(orderId);
