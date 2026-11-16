@@ -27,7 +27,7 @@ mvn test
 | `domain` | records `Account`, `Security`, `Order`, `SearchResult`, `OrderDecision` (sealed) | — |
 | `broker` | данные (`DemoData`), хранилища в памяти, `quote`, `order` | **1** — `findSecurity`, `placeOrder`, `confirm`, `reject` + тесты |
 | `agent` | `ToolLoop`, `GroundedExecutor`, определения инструментов, системный промпт, сессии, трассы | **3, 5** — выполнение инструментов; **4** — `AssistantService.chat`; **7** — подключить grounding |
-| `web` | все эндпоинты, DTO, ProblemDetail-ошибки, `/admin/reset` | — |
+| `web` | все эндпоинты, DTO, ProblemDetail-ошибки | — |
 
 Невыполненные части бросают `UnsupportedOperationException("Задание N: …")` — API отвечает `501` с этим
 текстом, так что сразу видно, что осталось.
