@@ -292,7 +292,8 @@ class BrokerServiceTest {
         Account account = service.accountById("BRK-2").orElseThrow();
         assertMoney("1.60", account.getCash());
         assertEquals(18L, account.quantityByTicker("SMPL"));
-        assertNotEquals(OrderStatus.EXECUTED, second.getStatus());
+        assertEquals(OrderStatus.FAILED, second.getStatus());
+        assertEquals(d instanceof OrderDecision.Refused r ? r.message() : null, second.getReason());
     }
 
     @Test
@@ -305,6 +306,33 @@ class BrokerServiceTest {
 
         assertEquals(Reason.INSUFFICIENT_POSITION, refusedReason(d));
         assertEquals(2L, service.accountById("BRK-2").orElseThrow().quantityByTicker("SMPL"));
+        assertEquals(OrderStatus.FAILED, second.getStatus());
+    }
+
+    @Test
+    void failedOrderCannotBeConfirmedAgain() {
+        Order first = placeOk("BRK-2", OrderSide.SELL, "SMPL", 8);
+        Order second = placeOk("BRK-2", OrderSide.SELL, "SMPL", 8);
+        service.confirmOrder("BRK-2", first.getId());
+        service.confirmOrder("BRK-2", second.getId());
+
+        OrderDecision again = service.confirmOrder("BRK-2", second.getId());
+
+        assertEquals("Can't confirm order with status = FAILED", refusedMessage(again));
+    }
+
+    @Test
+    void confirmFailsWithoutFreeTradeWhenTickerIsUnknown() {
+        Account account = service.accountById("BRK-1").orElseThrow();
+        Order ghost = new Order("ORD-GHOST", "BRK-1", OrderSide.BUY, "GHOST", 10, new BigDecimal("1.00"));
+        orders.add(ghost);
+
+        OrderDecision d = service.confirmOrder("BRK-1", ghost.getId());
+
+        assertEquals(Reason.UNKNOWN_SECURITY, refusedReason(d));
+        assertEquals(OrderStatus.FAILED, ghost.getStatus());
+        assertMoney("10000.00", account.getCash());
+        assertEquals(0L, account.quantityByTicker("GHOST"));
     }
 
     @Test

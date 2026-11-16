@@ -114,37 +114,31 @@ public class BrokerService {
             return OrderDecision.Refused.cannotConfirm(order.getStatus());
         }
 
-        BigDecimal price = currentPriceByTicker(order.getTicker()).orElse(BigDecimal.ZERO);
-        BigDecimal total = BigDecimal.valueOf(order.getQuantity()).multiply(price);
+        Optional<BigDecimal> optPrice = currentPriceByTicker(order.getTicker());
+        if (optPrice.isEmpty()) {
+            return failOrder(order, OrderDecision.Refused.unknownSecurity(order.getTicker()));
+        }
+        BigDecimal price = optPrice.get();
+        long quantity = order.getQuantity();
 
         if (order.getSide() == OrderSide.BUY) {
-            BigDecimal cash = account.getCash();
-            if (total.compareTo(cash) > 0) {
-                return OrderDecision.Refused.insufficientFunds(total, cash);
+            if (!account.add(order.getTicker(), quantity, price)) {
+                BigDecimal total = BigDecimal.valueOf(quantity).multiply(price);
+                return failOrder(order, OrderDecision.Refused.insufficientFunds(total, account.getCash()));
             }
-        }
-        if (order.getSide() == OrderSide.SELL) {
-            long amount = account.quantityByTicker(order.getTicker());
-            if (order.getQuantity() > amount) {
-                return OrderDecision.Refused.insufficientPosition(order.getQuantity(), amount);
-            }
+        } else if (!account.subtract(order.getTicker(), quantity, price)) {
+            return failOrder(order,
+                    OrderDecision.Refused.insufficientPosition(quantity, account.quantityByTicker(order.getTicker())));
         }
 
-        Order executedOrder = executeOrder(account, order);
-        return new OrderDecision.Confirmed(executedOrder);
+        order.setStatus(OrderStatus.EXECUTED, "Order confirmed");
+        return new OrderDecision.Confirmed(order);
     }
 
-    private Order executeOrder(Account account, Order order) {
-        order.setStatus(OrderStatus.EXECUTED, "Order confirmed");
-        String ticker = order.getTicker();
-        BigDecimal price = currentPriceByTicker(ticker).orElse(BigDecimal.ZERO);
-        if (order.getSide() == OrderSide.BUY) {
-            account.add(ticker, order.getQuantity(), price);
-        }
-        if (order.getSide() == OrderSide.SELL) {
-            account.subtract(ticker, order.getQuantity(), price);
-        }
-        return order;
+    /** The re-check at confirm time failed: the order becomes FAILED with the reason, the account stays untouched. */
+    private static OrderDecision failOrder(Order order, OrderDecision.Refused refusal) {
+        order.setStatus(OrderStatus.FAILED, refusal.message());
+        return refusal;
     }
 
     /** Task 1. Reject an order: PENDING_CONFIRMATION → REJECTED_BY_USER, other statuses are left unchanged. */
