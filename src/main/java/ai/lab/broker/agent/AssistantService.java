@@ -28,12 +28,14 @@ public class AssistantService {
     }
 
     /**
-     * Задание 4. Примерный порядок:
+     * Задание 4. accountId приходит из заголовка запроса и дальше идёт только через код: модель его не видит.
+     * Примерный порядок:
      * <ol>
-     *   <li>диалог сессии: {@code sessions.getOrCreate(sessionId, () -> conversations.create(SystemPrompt.TEXT,
+     *   <li>диалог сессии: {@code sessions.getOrCreate(accountId, sessionId, () -> conversations.create(SystemPrompt.TEXT,
      *       tools.definitions()))}; два параллельных запроса одной сессии не должны перемешать историю;</li>
      *   <li>{@code conversation.addUserMessage(message)};</li>
-     *   <li>{@code ToolLoop.run(conversation, tools::execute, agent.maxSteps())}; при limitReached — честный
+     *   <li>{@code ToolLoop.run(conversation, call -> tools.execute(accountId, call), agent.maxSteps())}
+     *       (исполнитель создаётся на каждый запрос и замыкает accountId; для GroundedExecutor — тот же делегат); при limitReached — честный
      *       ответ «не уложился», а не обрывок текста модели;</li>
      *   <li>pendingOrder и candidates собрать из результатов инструментов этого сообщения (не из текста модели);</li>
      *   <li>{@link Trace} из шагов ({@link Trace.Step#from}) → {@code traces.save(...)};</li>
@@ -41,12 +43,12 @@ public class AssistantService {
      * </ol>
      * Исключения провайдера (сеть, 429, 5xx) — не стек пользователю, а понятная ошибка API.
      */
-    public ChatResponse chat(String sessionId, String message) {
+    public ChatResponse chat(String accountId, String sessionId, String message) {
         throw new UnsupportedOperationException("Задание 4: AssistantService.chat");
     }
 
     /** Новая сессия с чистой историей. */
-    public void resetSession(String sessionId) {
-        sessions.remove(sessionId);
+    public void resetSession(String accountId, String sessionId) {
+        sessions.remove(accountId, sessionId);
     }
 }

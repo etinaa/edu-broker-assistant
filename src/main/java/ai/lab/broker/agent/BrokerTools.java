@@ -19,6 +19,10 @@ import java.util.List;
  * Инструменты ассистента: определения (в формате Claude: name, description, input_schema) и их выполнение
  * через {@link BrokerService}. Описание инструмента — это промпт: модель выбирает инструмент и заполняет
  * аргументы только по нему. Подтверждения сделки среди инструментов нет и не будет.
+ * <p>
+ * Счёт модель не знает и не выбирает: {@code accountId} приходит из запроса (заголовок X-Account-Id) и передаётся
+ * в {@link #execute} кодом. В схемах инструментов параметра счёта нет, а результаты инструментов не должны его
+ * содержать: сериализуй не {@code Account}/{@code Order} целиком (там есть id и accountId), а представления без номера счёта.
  */
 @Component
 public class BrokerTools {
@@ -103,19 +107,19 @@ public class BrokerTools {
         return definitions.deepCopy();
     }
 
-    /** Выполнение вызова. Неизвестный инструмент — ошибка для модели, а не исключение. */
-    public ToolResult execute(ToolCall call) {
+    /** Выполнение вызова от имени счёта accountId. Неизвестный инструмент — ошибка для модели, а не исключение. */
+    public ToolResult execute(String accountId, ToolCall call) {
         return switch (call.name()) {
-            case "get_account_summary" -> getAccountSummary(call);
+            case "get_account_summary" -> getAccountSummary(accountId, call);
             case "find_security" -> findSecurity(call);
             case "get_quote" -> getQuote(call);
-            case "place_order" -> placeOrder(call);
+            case "place_order" -> placeOrder(accountId, call);
             default -> ToolResult.error(call, "Неизвестный инструмент " + call.name());
         };
     }
 
-    /** Задание 3: broker.account() → JSON с деньгами и позициями (название бумаги — из справочника). */
-    private ToolResult getAccountSummary(ToolCall call) {
+    /** Задание 3: broker.accountById(accountId) → JSON с деньгами и позициями (название бумаги — из справочника). */
+    private ToolResult getAccountSummary(String accountId, ToolCall call) {
         throw new UnsupportedOperationException("Задание 3: get_account_summary");
     }
 
@@ -131,10 +135,10 @@ public class BrokerTools {
 
     /**
      * Задание 5: разобрать и провалидировать аргументы (side из enum, quantity — целое положительное:
-     * 2.5 → отказ), вызвать broker.placeOrder и вернуть Created или Refused как обычный результат
+     * 2.5 → отказ), вызвать broker.placeOrder(accountId, …) и вернуть Created или Refused как обычный результат
      * (не is_error: отказ — нормальный исход, который модель пересказывает).
      */
-    private ToolResult placeOrder(ToolCall call) {
+    private ToolResult placeOrder(String accountId, ToolCall call) {
         throw new UnsupportedOperationException("Задание 5: place_order");
     }
 

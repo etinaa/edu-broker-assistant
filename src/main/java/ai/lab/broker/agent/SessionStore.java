@@ -9,20 +9,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Сессии в памяти: sessionId → диалог с моделью (вся история). У raw API памяти нет — она здесь.
+ * Сессии в памяти: (счёт, sessionId) → диалог с моделью (вся история). У raw API памяти нет — она здесь.
+ * Ключ включает счёт: в истории лежат баланс и позиции, и клиент другого счёта с тем же sessionId
+ * не должен получить чужой диалог.
  * Задание 4: лимит длины истории (что делать, когда сессия перестаёт помещаться в окно контекста?).
  */
 @Component
 public class SessionStore {
 
-    private final Map<String, ToolConversation> sessions = new ConcurrentHashMap<>();
+    private record Key(String accountId, String sessionId) {}
 
-    public ToolConversation getOrCreate(String sessionId, Supplier<ToolConversation> factory) {
-        return sessions.computeIfAbsent(sessionId, id -> factory.get());
+    private final Map<Key, ToolConversation> sessions = new ConcurrentHashMap<>();
+
+    public ToolConversation getOrCreate(String accountId, String sessionId, Supplier<ToolConversation> factory) {
+        return sessions.computeIfAbsent(new Key(accountId, sessionId), key -> factory.get());
     }
 
-    public void remove(String sessionId) {
-        sessions.remove(sessionId);
+    public void remove(String accountId, String sessionId) {
+        sessions.remove(new Key(accountId, sessionId));
     }
 
     public void clear() {
