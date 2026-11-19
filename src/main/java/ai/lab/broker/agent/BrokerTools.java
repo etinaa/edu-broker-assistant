@@ -100,6 +100,8 @@ public class BrokerTools {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+    private static final String TICKER_REQUIRED = "Аргумент ticker обязателен: непустая строка с точным тикером";
+
     private final BrokerService broker;
     private final ArrayNode definitions;
 
@@ -187,6 +189,11 @@ public class BrokerTools {
         return call.arguments() == null ? MissingNode.getInstance() : call.arguments();
     }
 
+    /** Тикер из аргументов без пробелов по краям; пустая строка, если его нет. */
+    private static String tickerOf(JsonNode args) {
+        return args.path("ticker").asText("").strip();
+    }
+
     private static Map<String, Object> securityView(Security security) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("ticker", security.ticker());
@@ -195,9 +202,23 @@ public class BrokerTools {
         return view;
     }
 
-    /** Задание 3: broker.quote(ticker) → цена или ошибка «бумага не найдена». */
+    /** Цена бумаги по точному тикеру (в ответе канонический тикер из справочника); неизвестный тикер — is_error. */
     private ToolResult getQuote(ToolCall call) {
-        throw new UnsupportedOperationException("Задание 3: get_quote");
+        String ticker = tickerOf(argumentsOf(call));
+        if (ticker.isEmpty()) {
+            return ToolResult.error(call, TICKER_REQUIRED);
+        }
+
+        Optional<Security> security = broker.securityByTicker(ticker);
+        if (security.isEmpty()) {
+            return ToolResult.error(call, "Бумага с тикером " + ticker + " не найдена. Найди её через find_security");
+        }
+
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("ticker", security.get().ticker());
+        view.put("price", security.get().currentPrice());
+        view.put("currency", "USD");
+        return ToolResult.ok(call, toJson(view));
     }
 
     /**
@@ -213,9 +234,9 @@ public class BrokerTools {
         if (side == null) {
             return ToolResult.error(call, "Аргумент side обязателен и должен быть BUY или SELL");
         }
-        String ticker = args.path("ticker").asText("").strip();
+        String ticker = tickerOf(args);
         if (ticker.isEmpty()) {
-            return ToolResult.error(call, "Аргумент ticker обязателен: непустая строка с точным тикером");
+            return ToolResult.error(call, TICKER_REQUIRED);
         }
         JsonNode quantityNode = args.path("quantity");
         if (quantityNode.isMissingNode() || quantityNode.isNull()) {
