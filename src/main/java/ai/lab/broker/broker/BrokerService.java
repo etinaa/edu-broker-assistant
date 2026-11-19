@@ -31,6 +31,10 @@ public class BrokerService {
         return securities.byTicker(ticker).map(Security::currentPrice);
     }
 
+    public Optional<Security> securityByTicker(String ticker) {
+        return securities.byTicker(ticker);
+    }
+
     public Optional<Account> accountById(String accountId) {
         return accounts.byId(accountId);
     }

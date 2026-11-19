@@ -1,9 +1,11 @@
 package ai.lab.broker.agent;
 
 import ai.lab.broker.broker.BrokerService;
+import ai.lab.broker.domain.Account;
 import ai.lab.broker.domain.Order;
 import ai.lab.broker.domain.OrderDecision;
 import ai.lab.broker.domain.OrderSide;
+import ai.lab.broker.domain.Security;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
@@ -19,10 +21,12 @@ import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Инструменты ассистента: определения (в формате Claude: name, description, input_schema) и их выполнение
@@ -127,9 +131,31 @@ public class BrokerTools {
         };
     }
 
-    /** Задание 3: broker.accountById(accountId) → JSON с деньгами и позициями (название бумаги — из справочника). */
+    /** Деньги и позиции счёта без номера счёта; название бумаги — из справочника. Нулевые позиции не показываем. */
     private ToolResult getAccountSummary(String accountId, ToolCall call) {
-        throw new UnsupportedOperationException("Задание 3: get_account_summary");
+        Optional<Account> optAccount = broker.accountById(accountId);
+        if (optAccount.isEmpty()) {
+            return ToolResult.error(call, "Счёт не найден");
+        }
+        Account account = optAccount.get();
+
+        List<Map<String, Object>> positions = new ArrayList<>();
+        account.getPositions().entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    Map<String, Object> position = new LinkedHashMap<>();
+                    position.put("ticker", entry.getKey());
+                    position.put("name", broker.securityByTicker(entry.getKey()).map(Security::name).orElse(null));
+                    position.put("quantity", entry.getValue());
+                    positions.add(position);
+                });
+
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("cash", account.getCash());
+        view.put("currency", "USD");
+        view.put("positions", positions);
+        return ToolResult.ok(call, toJson(view));
     }
 
     /** Задание 3: broker.findSecurity(query) → JSON с match и списком бумаг. */
