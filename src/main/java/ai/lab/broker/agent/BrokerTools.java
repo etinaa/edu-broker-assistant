@@ -21,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -139,23 +138,25 @@ public class BrokerTools {
         }
         Account account = optAccount.get();
 
-        List<Map<String, Object>> positions = new ArrayList<>();
-        account.getPositions().entrySet().stream()
+        List<Map<String, Object>> positions = account.getPositions().entrySet().stream()
                 .filter(entry -> entry.getValue() > 0)
                 .sorted(Map.Entry.comparingByKey())
-                .forEach(entry -> {
-                    Map<String, Object> position = new LinkedHashMap<>();
-                    position.put("ticker", entry.getKey());
-                    position.put("name", broker.securityByTicker(entry.getKey()).map(Security::name).orElse(null));
-                    position.put("quantity", entry.getValue());
-                    positions.add(position);
-                });
+                .map(entry -> positionView(entry.getKey(), entry.getValue()))
+                .toList();
 
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("cash", account.getCash());
         view.put("currency", "USD");
         view.put("positions", positions);
         return ToolResult.ok(call, toJson(view));
+    }
+
+    private Map<String, Object> positionView(String ticker, long quantity) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("ticker", ticker);
+        view.put("name", broker.securityByTicker(ticker).map(Security::name).orElse(null));
+        view.put("quantity", quantity);
+        return view;
     }
 
     /** Задание 3: broker.findSecurity(query) → JSON с match и списком бумаг. */
