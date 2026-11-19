@@ -5,6 +5,7 @@ import ai.lab.broker.domain.Account;
 import ai.lab.broker.domain.Order;
 import ai.lab.broker.domain.OrderDecision;
 import ai.lab.broker.domain.OrderSide;
+import ai.lab.broker.domain.SearchResult;
 import ai.lab.broker.domain.Security;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
@@ -159,9 +160,39 @@ public class BrokerTools {
         return view;
     }
 
-    /** Задание 3: broker.findSecurity(query) → JSON с match и списком бумаг. */
+    /**
+     * broker.findSecurity(query) → JSON с match и списком бумаг (тикер, ISIN, название). Пустой запрос — это
+     * NOT_FOUND от сервиса, а не is_error; is_error только если поля query нет или оно не строка.
+     */
     private ToolResult findSecurity(ToolCall call) {
-        throw new UnsupportedOperationException("Задание 3: find_security");
+        JsonNode args = argumentsOf(call);
+        JsonNode queryNode = args.path("query");
+        if (!queryNode.isTextual()) {
+            return ToolResult.error(call, "Аргумент query обязателен: строка с тикером, ISIN или частью названия");
+        }
+
+        SearchResult result = broker.findSecurity(queryNode.asText());
+        List<Map<String, Object>> securities = result.securities().stream()
+                .map(BrokerTools::securityView)
+                .toList();
+
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("match", result.match());
+        view.put("securities", securities);
+        return ToolResult.ok(call, toJson(view));
+    }
+
+    /** Аргументы вызова; если модель их не прислала — «пустой» узел, чтобы path() не падал на null. */
+    private static JsonNode argumentsOf(ToolCall call) {
+        return call.arguments() == null ? MissingNode.getInstance() : call.arguments();
+    }
+
+    private static Map<String, Object> securityView(Security security) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("ticker", security.ticker());
+        view.put("isin", security.isin());
+        view.put("name", security.name());
+        return view;
     }
 
     /** Задание 3: broker.quote(ticker) → цена или ошибка «бумага не найдена». */
@@ -176,7 +207,7 @@ public class BrokerTools {
      * которые не соответствуют схеме (нет поля, неизвестный side): так модель понимает, что вызов надо исправить.
      */
     private ToolResult placeOrder(String accountId, ToolCall call) {
-        JsonNode args = call.arguments() == null ? MissingNode.getInstance() : call.arguments();
+        JsonNode args = argumentsOf(call);
 
         OrderSide side = parseSide(args.path("side"));
         if (side == null) {
