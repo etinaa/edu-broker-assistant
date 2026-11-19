@@ -1,19 +1,28 @@
 package ai.lab.broker.agent;
 
 import ai.lab.broker.broker.BrokerService;
+import ai.lab.broker.domain.Order;
+import ai.lab.broker.domain.OrderDecision;
+import ai.lab.broker.domain.OrderSide;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Инструменты ассистента: определения (в формате Claude: name, description, input_schema) и их выполнение
@@ -134,12 +143,105 @@ public class BrokerTools {
     }
 
     /**
-     * Задание 5: разобрать и провалидировать аргументы (side из enum, quantity — целое положительное:
-     * 2.5 → отказ), вызвать broker.placeOrder(accountId, …) и вернуть Created или Refused как обычный результат
-     * (не is_error: отказ — нормальный исход, который модель пересказывает).
+     * Разбирает аргументы (side из enum, ticker — непустая строка, quantity — целое положительное), вызывает
+     * broker.placeOrder(accountId, …) и возвращает Created или Refused как обычный результат: отказ (в том числе
+     * нецелое количество 2.5) — нормальный исход, который модель пересказывает. is_error — только для аргументов,
+     * которые не соответствуют схеме (нет поля, неизвестный side): так модель понимает, что вызов надо исправить.
      */
     private ToolResult placeOrder(String accountId, ToolCall call) {
-        throw new UnsupportedOperationException("Задание 5: place_order");
+        JsonNode args = call.arguments() == null ? MissingNode.getInstance() : call.arguments();
+
+        OrderSide side = parseSide(args.path("side"));
+        if (side == null) {
+            return ToolResult.error(call, "Аргумент side обязателен и должен быть BUY или SELL");
+        }
+        String ticker = args.path("ticker").asText("").strip();
+        if (ticker.isEmpty()) {
+            return ToolResult.error(call, "Аргумент ticker обязателен: непустая строка с точным тикером");
+        }
+        JsonNode quantityNode = args.path("quantity");
+        if (quantityNode.isMissingNode() || quantityNode.isNull()) {
+            return ToolResult.error(call, "Аргумент quantity обязателен: целое положительное число");
+        }
+
+        return toToolResult(call, decide(accountId, side, ticker, quantityNode));
+    }
+
+    /** Нецелое количество — отказ того же вида, что и остальные, чтобы модель пересказала его как обычный исход. */
+    private OrderDecision decide(String accountId, OrderSide side, String ticker, JsonNode quantityNode) {
+        Long quantity = parseWholeQuantity(quantityNode);
+        if (quantity == null) {
+            return OrderDecision.Refused.nonIntegerQuantity(quantityNode.asText());
+        }
+        return broker.placeOrder(accountId, side, ticker, quantity);
+    }
+
+    private static ToolResult toToolResult(ToolCall call, OrderDecision decision) {
+        return switch (decision) {
+            case OrderDecision.Created created -> ToolResult.ok(call, toJson(createdView(created)));
+            case OrderDecision.Refused refused -> ToolResult.ok(call, toJson(refusedView(refused)));
+            default -> ToolResult.error(call, "Неожиданный результат создания заявки: " + decision);
+        };
+    }
+
+    private static OrderSide parseSide(JsonNode node) {
+        if (!node.isTextual()) {
+            return null;
+        }
+        try {
+            return OrderSide.valueOf(node.asText().strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** Целое количество из числа или строки ("5", 5, 5.0); 2.5, "abc", слишком большое число — null. */
+    private static Long parseWholeQuantity(JsonNode node) {
+        BigDecimal value;
+        if (node.isNumber()) {
+            value = node.decimalValue();
+        } else if (node.isTextual()) {
+            try {
+                value = new BigDecimal(node.asText().strip());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException e) {
+            return null;
+        }
+    }
+
+    /** Представление созданной заявки для модели: id заявки есть, номера счёта нет. */
+    private static Map<String, Object> createdView(OrderDecision.Created created) {
+        Order order = created.order();
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("result", "CREATED");
+        view.put("orderId", order.getId());
+        view.put("status", order.getStatus());
+        view.put("side", order.getSide());
+        view.put("ticker", order.getTicker());
+        view.put("quantity", order.getQuantity());
+        view.put("price", order.getPrice());
+        view.put("total", order.total());
+        view.put("cashAfter", created.cashAfter());
+        return view;
+    }
+
+    /** Отказ с числами из кода (needed/available/shortfall — null для отказов без цифр). */
+    private static Map<String, Object> refusedView(OrderDecision.Refused refused) {
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("result", "REFUSED");
+        view.put("reason", refused.reason());
+        view.put("message", refused.message());
+        view.put("needed", refused.needed());
+        view.put("available", refused.available());
+        view.put("shortfall", refused.shortfall());
+        return view;
     }
 
     /** Сериализация результатов инструментов: BigDecimal как числа, даты — ISO-строкой. */

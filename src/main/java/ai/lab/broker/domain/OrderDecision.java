@@ -49,6 +49,11 @@ public sealed interface OrderDecision {
             return new Refused(Reason.INVALID_QUANTITY, "Quantity must be greater than 0");
         }
 
+        public static Refused nonIntegerQuantity(String quantity) {
+            return new Refused(Reason.INVALID_QUANTITY,
+                    "Quantity must be a whole positive number of shares, got " + quantity);
+        }
+
         public static Refused unknownSecurity(String ticker) {
             return new Refused(Reason.UNKNOWN_SECURITY, "Security with ticker = " + ticker + " not found");
         }
