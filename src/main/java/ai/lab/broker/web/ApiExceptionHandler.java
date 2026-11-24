@@ -1,5 +1,7 @@
 package ai.lab.broker.web;
 
+import ai.lab.broker.agent.AssistantUnavailableException;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +17,12 @@ class ApiExceptionHandler {
     @ExceptionHandler(UnsupportedOperationException.class)
     ProblemDetail notImplemented(UnsupportedOperationException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, e.getMessage());
+    }
+
+    /** The model provider failed: 502 with a generic message, the provider's response body stays in the log. */
+    @ExceptionHandler(AssistantUnavailableException.class)
+    ProblemDetail assistantUnavailable(AssistantUnavailableException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
     @ExceptionHandler(NoSuchElementException.class)

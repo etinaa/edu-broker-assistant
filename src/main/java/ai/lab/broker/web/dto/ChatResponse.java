@@ -1,5 +1,6 @@
 package ai.lab.broker.web.dto;
 
+import ai.lab.broker.domain.Order;
 import ai.lab.broker.domain.OrderDecision;
 import ai.lab.broker.domain.OrderSide;
 import ai.lab.broker.domain.OrderStatus;
@@ -19,10 +20,13 @@ public record ChatResponse(String answer, PendingOrder pendingOrder, List<Securi
     public record PendingOrder(String orderId, OrderSide side, String ticker, long quantity,
                                BigDecimal price, BigDecimal total, BigDecimal cashAfter, OrderStatus status) {
 
-        /*public static PendingOrder from(OrderDecision.Created created) {
-            var o = created.order();
-            return new PendingOrder(o.id(), o.side(), o.ticker(), o.quantity(), o.price(), o.total(),
-                    created.cashAfter(), o.status());
-        }*/
+        public static PendingOrder from(OrderDecision.Created created) {
+            return from(created.order(), created.cashAfter());
+        }
+
+        public static PendingOrder from(Order order, BigDecimal cashAfter) {
+            return new PendingOrder(order.getId(), order.getSide(), order.getTicker(), order.getQuantity(),
+                    order.getPrice(), order.total(), cashAfter, order.getStatus());
+        }
     }
 }
