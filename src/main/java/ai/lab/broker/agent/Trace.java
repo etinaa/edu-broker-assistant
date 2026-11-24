@@ -9,8 +9,9 @@ import java.util.List;
 /**
  * Трасса обработки одного сообщения: шаги агента, вызовы инструментов, токены и стоимость.
  * Отдаётся через GET /traces/{id}; на этапе 4 её заменит OpenTelemetry.
+ * accountId — владелец трассы: в ней баланс и позиции счёта, поэтому отдаётся она только этому счёту.
  */
-public record Trace(String id, String sessionId, String message, String model, List<Step> steps,
+public record Trace(String id, String accountId, String sessionId, String message, String model, List<Step> steps,
                     String answer, boolean limitReached, Instant createdAt) {
 
     /** Один запрос к модели и вызовы, которые он породил (пусто — финальный ответ). */

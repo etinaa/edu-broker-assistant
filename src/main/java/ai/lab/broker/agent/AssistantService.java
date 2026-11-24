@@ -84,7 +84,7 @@ public class AssistantService {
                 .toList();
         String answer = result.limitReached() ? LIMIT_REACHED_ANSWER : result.answer();
 
-        Trace trace = new Trace(traces.nextId(), sessionId, message, conversation.name(),
+        Trace trace = new Trace(traces.nextId(), accountId, sessionId, message, conversation.name(),
                 result.steps().stream().map(Trace.Step::from).toList(),
                 answer, result.limitReached(), Instant.now());
         traces.save(trace);

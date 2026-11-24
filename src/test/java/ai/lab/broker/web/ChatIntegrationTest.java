@@ -195,12 +195,32 @@ class ChatIntegrationTest {
 
         String traceId = body(chat("BRK-1", "s1", "price of SMPL")).path("traceId").asText();
 
-        mvc.perform(get("/traces/" + traceId))
+        mvc.perform(get("/traces/" + traceId).header(HEADER, "BRK-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("price of SMPL"))
                 .andExpect(jsonPath("$.model").value("scripted/test"))
                 .andExpect(jsonPath("$.steps.length()").value(2))
                 .andExpect(jsonPath("$.steps[0].calls[0].tool").value("get_quote"));
+    }
+
+    @Test
+    void traceOfAnotherAccountIs404() throws Exception {
+        model.callsTool("get_account_summary", "{}").answers("You have 10000.00 USD");
+
+        String traceId = body(chat("BRK-1", "s1", "what do I have")).path("traceId").asText();
+
+        mvc.perform(get("/traces/" + traceId).header(HEADER, "BRK-2"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(not(containsString("10000"))));
+    }
+
+    @Test
+    void traceWithoutAccountHeaderIs400() throws Exception {
+        model.answers("hi");
+
+        String traceId = body(chat("BRK-1", "s1", "hi")).path("traceId").asText();
+
+        mvc.perform(get("/traces/" + traceId)).andExpect(status().isBadRequest());
     }
 
     @Test
