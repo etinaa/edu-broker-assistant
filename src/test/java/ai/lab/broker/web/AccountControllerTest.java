@@ -42,7 +42,7 @@ class AccountControllerTest {
         when(broker.accountById("BRK-1")).thenReturn(Optional.of(
                 new Account("BRK-1", new BigDecimal("10000.00"), Map.of("TRNC", 20L))));
 
-        mvc.perform(get("/accounts/BRK-1"))
+        mvc.perform(get("/accounts/BRK-1").header("X-Account-Id", "BRK-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("BRK-1"))
                 .andExpect(jsonPath("$.cash").value(10000.00))
@@ -53,10 +53,26 @@ class AccountControllerTest {
     void accountReturns404ProblemDetailWhenNotFound() throws Exception {
         when(broker.accountById("nope")).thenReturn(Optional.empty());
 
-        mvc.perform(get("/accounts/nope"))
+        mvc.perform(get("/accounts/nope").header("X-Account-Id", "nope"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.detail").value("Account nope not found"));
+    }
+
+    @Test
+    void anotherAccountIs404LikeAMissingOne() throws Exception {
+        when(broker.accountById("BRK-1")).thenReturn(Optional.of(
+                new Account("BRK-1", new BigDecimal("10000.00"), Map.of("TRNC", 20L))));
+
+        mvc.perform(get("/accounts/BRK-1").header("X-Account-Id", "BRK-2"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Account BRK-1 not found"))
+                .andExpect(jsonPath("$.cash").doesNotExist());
+    }
+
+    @Test
+    void accountWithoutHeaderIs400() throws Exception {
+        mvc.perform(get("/accounts/BRK-1")).andExpect(status().isBadRequest());
     }
 
     // ---- GET /securities/search ----
