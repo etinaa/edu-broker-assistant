@@ -48,6 +48,12 @@ public interface ToolConversation {
     /** Number of messages in the history; useful for the session history limit. */
     int size();
 
+    /**
+     * Removes the oldest exchange: a user message with all the model's replies, tool calls and results that
+     * followed it. Returns false and changes nothing if only the latest exchange is left.
+     */
+    boolean dropOldestExchange();
+
     /** Provider and model name, for traces. */
     String name();
 }

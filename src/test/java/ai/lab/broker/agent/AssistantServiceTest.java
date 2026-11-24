@@ -47,7 +47,7 @@ class AssistantServiceTest {
         service = new AssistantService((system, tools) -> {
             created++;
             return new ScriptedConversation();
-        }, new BrokerTools(broker), broker, new SessionStore(), traces, new AgentProperties(3, 0.0));
+        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40)), traces, new AgentProperties(3, 0.0, 40));
     }
 
     private static LlmResponse response(String text) {
@@ -205,6 +205,11 @@ class AssistantServiceTest {
         @Override
         public int size() {
             return size;
+        }
+
+        @Override
+        public boolean dropOldestExchange() {
+            return false;
         }
 
         @Override

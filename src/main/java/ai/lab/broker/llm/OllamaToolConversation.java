@@ -80,6 +80,11 @@ public final class OllamaToolConversation implements ToolConversation {
     }
 
     @Override
+    public boolean dropOldestExchange() {
+        return History.dropOldestExchange(messages);
+    }
+
+    @Override
     public String name() {
         return ollama.name();
     }

@@ -21,6 +21,8 @@ llm:
 agent:
   max-steps: 6
   temperature: 0.0
+  # Session history limit in messages. Older exchanges are dropped whole; the latest one always stays.
+  max-history-messages: 40
 
 management:
   endpoints:

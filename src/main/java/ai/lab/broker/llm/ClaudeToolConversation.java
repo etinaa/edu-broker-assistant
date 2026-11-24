@@ -74,6 +74,11 @@ public final class ClaudeToolConversation implements ToolConversation {
     }
 
     @Override
+    public boolean dropOldestExchange() {
+        return History.dropOldestExchange(messages);
+    }
+
+    @Override
     public String name() {
         return claude.name();
     }

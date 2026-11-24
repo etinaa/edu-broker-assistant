@@ -60,6 +60,7 @@ public class AssistantService {
      * <ol>
      *   <li>The session's conversation is locked for the whole request, so two parallel messages of one session
      *       cannot interleave in its history.</li>
+     *   <li>Before the new message, the history is trimmed to the session limit ({@link SessionStore#fitHistory}).</li>
      *   <li>The executor is created per request and closes over accountId.</li>
      *   <li>When the step limit is reached, the answer is an honest "could not finish", not a fragment of the
      *       model's text.</li>
@@ -73,6 +74,7 @@ public class AssistantService {
 
         ToolLoop.Result result;
         synchronized (conversation) {
+            sessions.fitHistory(conversation);
             conversation.addUserMessage(message);
             result = runLoop(conversation, accountId);
         }
