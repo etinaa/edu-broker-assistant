@@ -1,6 +1,7 @@
 package ai.lab.broker.web;
 
 import ai.lab.broker.broker.BrokerService;
+import ai.lab.broker.domain.OrderStatus;
 import ai.lab.broker.llm.ScriptedConversationFactory;
 import ai.lab.broker.llm.ToolConversationFactory;
 
@@ -221,6 +222,25 @@ class ChatIntegrationTest {
         String traceId = body(chat("BRK-1", "s1", "hi")).path("traceId").asText();
 
         mvc.perform(get("/traces/" + traceId)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void failedMessageIsRolledBackAndItsOrderCancelled() throws Exception {
+        model.answers("hello")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .fails(new IllegalStateException("Claude 529: overloaded"))
+                .answers("retry answer");
+
+        chat("BRK-1", "s1", "hi").andExpect(status().isOk());
+        chat("BRK-1", "s1", "buy 2 TRNC").andExpect(status().isBadGateway());
+
+        var conversation = model.lastConversation();
+        assertEquals(List.of("hi"), conversation.userMessages());
+        assertTrue(conversation.toolResults().isEmpty());
+        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+
+        chat("BRK-1", "s1", "buy 2 TRNC").andExpect(status().isOk());
+        assertEquals(List.of("hi", "buy 2 TRNC"), conversation.userMessages());
     }
 
     @Test

@@ -72,6 +72,11 @@ class SessionStoreTest {
         }
 
         @Override
+        public void truncate(int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean dropOldestExchange() {
             if (exchanges.size() <= 1) {
                 return false;

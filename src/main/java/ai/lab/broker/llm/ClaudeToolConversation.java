@@ -79,6 +79,11 @@ public final class ClaudeToolConversation implements ToolConversation {
     }
 
     @Override
+    public void truncate(int size) {
+        History.truncate(messages, size);
+    }
+
+    @Override
     public String name() {
         return claude.name();
     }

@@ -85,6 +85,11 @@ public final class OllamaToolConversation implements ToolConversation {
     }
 
     @Override
+    public void truncate(int size) {
+        History.truncate(messages, size);
+    }
+
+    @Override
     public String name() {
         return ollama.name();
     }

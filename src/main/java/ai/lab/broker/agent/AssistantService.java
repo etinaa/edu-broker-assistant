@@ -4,6 +4,7 @@ import ai.lab.broker.broker.BrokerService;
 import ai.lab.broker.config.AgentProperties;
 import ai.lab.broker.domain.Security;
 import ai.lab.broker.llm.ToolConversation;
+import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 import ai.lab.broker.llm.ToolConversationFactory;
 import ai.lab.broker.web.dto.ChatResponse;
@@ -19,8 +20,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
@@ -67,6 +71,8 @@ public class AssistantService {
      *   <li>pendingOrder and candidates are built from this message's tool results, not from the model's text.</li>
      * </ol>
      * Provider failures (network, 429, 5xx) become {@link AssistantUnavailableException} without provider details.
+     * The failed message leaves no trace in the session: the history is rolled back to where it was before it, and
+     * orders created during it are cancelled. The user never saw them, and a retry must not leave a duplicate.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
         ToolConversation conversation = sessions.getOrCreate(accountId, sessionId,
@@ -75,8 +81,20 @@ public class AssistantService {
         ToolLoop.Result result;
         synchronized (conversation) {
             sessions.fitHistory(conversation);
+            int sizeBefore = conversation.size();
+            List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
-            result = runLoop(conversation, accountId);
+            try {
+                result = runLoop(conversation, call -> {
+                    ToolResult toolResult = tools.execute(accountId, call);
+                    executed.add(toolResult);
+                    return toolResult;
+                });
+            } catch (AssistantUnavailableException e) {
+                conversation.truncate(sizeBefore);
+                cancelCreatedOrders(accountId, executed);
+                throw e;
+            }
         }
 
         List<ToolResult> results = result.steps().stream()
@@ -97,9 +115,9 @@ public class AssistantService {
         sessions.remove(accountId, sessionId);
     }
 
-    private ToolLoop.Result runLoop(ToolConversation conversation, String accountId) {
+    private ToolLoop.Result runLoop(ToolConversation conversation, Function<ToolCall, ToolResult> executor) {
         try {
-            return ToolLoop.run(conversation, call -> tools.execute(accountId, call), agent.maxSteps());
+            return ToolLoop.run(conversation, executor, agent.maxSteps());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssistantUnavailableException("The request to the model was interrupted", e);
@@ -109,12 +127,26 @@ public class AssistantService {
         }
     }
 
-    /** The last order created by place_order in this message, or null; the order is read from the order book. */
-    private PendingOrder pendingOrder(List<ToolResult> results) {
-        return results.reversed().stream()
+    /** Orders the failed message created are rejected, so nothing the user never saw stays confirmable. */
+    private void cancelCreatedOrders(String accountId, List<ToolResult> executed) {
+        createdOrders(executed).forEach(body -> {
+            String orderId = body.path("orderId").asText();
+            log.warn("Cancelling order {} created by a failed chat request", orderId);
+            broker.rejectOrder(accountId, orderId);
+        });
+    }
+
+    /** Results of place_order that created an order, in call order. */
+    private static Stream<JsonNode> createdOrders(List<ToolResult> results) {
+        return results.stream()
                 .filter(result -> isSuccessOf(result, "place_order"))
                 .map(AssistantService::parse)
-                .filter(body -> "CREATED".equals(body.path("result").asText()))
+                .filter(body -> "CREATED".equals(body.path("result").asText()));
+    }
+
+    /** The last order created by place_order in this message, or null; the order is read from the order book. */
+    private PendingOrder pendingOrder(List<ToolResult> results) {
+        return createdOrders(results.reversed())
                 .findFirst()
                 .flatMap(body -> broker.orderById(body.path("orderId").asText())
                         .map(order -> PendingOrder.from(order, body.path("cashAfter").decimalValue())))

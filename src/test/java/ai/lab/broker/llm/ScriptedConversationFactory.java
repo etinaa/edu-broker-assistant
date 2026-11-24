@@ -83,9 +83,8 @@ public final class ScriptedConversationFactory implements ToolConversationFactor
     public final class Conversation implements ToolConversation {
         private final String system;
         private final ArrayNode tools;
-        private final List<String> userMessages = new ArrayList<>();
-        private final List<ToolResult> toolResults = new ArrayList<>();
-        private int size;
+        /** The history as the model would keep it: user messages (String), model turns (Turn), tool results. */
+        private final List<Object> history = new ArrayList<>();
 
         private Conversation(String system, ArrayNode tools) {
             this.system = system;
@@ -101,25 +100,24 @@ public final class ScriptedConversationFactory implements ToolConversationFactor
         }
 
         public List<String> userMessages() {
-            return List.copyOf(userMessages);
+            return history.stream().filter(String.class::isInstance).map(String.class::cast).toList();
         }
 
         public List<ToolResult> toolResults() {
-            return List.copyOf(toolResults);
+            return history.stream().filter(ToolResult.class::isInstance).map(ToolResult.class::cast).toList();
         }
 
         /** Everything the model was given in this conversation, as text: prompt, definitions, messages, results. */
         public String everythingSeen() {
             StringBuilder seen = new StringBuilder(system).append('\n').append(tools);
-            userMessages.forEach(message -> seen.append('\n').append(message));
-            toolResults.forEach(result -> seen.append('\n').append(result.content()));
+            userMessages().forEach(message -> seen.append('\n').append(message));
+            toolResults().forEach(result -> seen.append('\n').append(result.content()));
             return seen.toString();
         }
 
         @Override
         public void addUserMessage(String text) {
-            userMessages.add(text);
-            size++;
+            history.add(text);
         }
 
         @Override
@@ -128,19 +126,23 @@ public final class ScriptedConversationFactory implements ToolConversationFactor
             if (next instanceof Exception error) {
                 throw error;
             }
-            size++;
+            history.add(next);
             return (Turn) next;
         }
 
         @Override
         public void addToolResults(List<ToolResult> results) {
-            toolResults.addAll(results);
-            size += results.size();
+            history.addAll(results);
         }
 
         @Override
         public int size() {
-            return size;
+            return history.size();
+        }
+
+        @Override
+        public void truncate(int size) {
+            history.subList(size, history.size()).clear();
         }
 
         @Override

@@ -54,6 +54,9 @@ public interface ToolConversation {
      */
     boolean dropOldestExchange();
 
+    /** Removes every message after the first {@code size}: rolls the history back to an earlier {@link #size()}. */
+    void truncate(int size);
+
     /** Provider and model name, for traces. */
     String name();
 }

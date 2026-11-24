@@ -32,6 +32,16 @@ final class History {
         return true;
     }
 
+    /** Keeps the first {@code size} messages; a size outside 0..messages.size() is a bug in the caller. */
+    static void truncate(ArrayNode messages, int size) {
+        if (size < 0 || size > messages.size()) {
+            throw new IllegalArgumentException("Cannot truncate " + messages.size() + " messages to " + size);
+        }
+        while (messages.size() > size) {
+            messages.remove(messages.size() - 1);
+        }
+    }
+
     private static boolean startsExchange(JsonNode message) {
         return "user".equals(message.path("role").asText()) && message.path("content").isTextual();
     }

@@ -76,6 +76,21 @@ class HistoryTest {
     }
 
     @Test
+    void truncateKeepsTheFirstMessages() throws Exception {
+        ArrayNode messages = messages("""
+                [{"role":"user","content":"a"},{"role":"assistant","content":"b"},{"role":"user","content":"c"}]""");
+
+        History.truncate(messages, 1);
+
+        assertEquals(List.of("user:\"a\""), contents(messages));
+    }
+
+    @Test
+    void truncateBeyondTheHistoryIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> History.truncate(JSON.createArrayNode(), 1));
+    }
+
+    @Test
     void emptyHistoryHasNothingToDrop() {
         assertFalse(History.dropOldestExchange(JSON.createArrayNode()));
     }

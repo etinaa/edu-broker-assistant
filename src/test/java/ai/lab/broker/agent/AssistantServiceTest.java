@@ -208,6 +208,11 @@ class AssistantServiceTest {
         }
 
         @Override
+        public void truncate(int size) {
+            this.size = size;
+        }
+
+        @Override
         public boolean dropOldestExchange() {
             return false;
         }
