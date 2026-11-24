@@ -14,8 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Локальная модель через Ollama (POST /api/chat). Перенесено из stage1-llm-basics и урезано до запроса с
- * инструментами; адрес сервера, модель и окно контекста — из конфигурации.
+ * Local model via Ollama (POST /api/chat). Carried over from stage1-llm-basics and reduced to the request with
+ * tools; the server address, model and context window come from configuration.
  */
 @Slf4j
 public class OllamaClient {
@@ -28,7 +28,7 @@ public class OllamaClient {
     private final String model;
     private final Integer numCtx;
 
-    /** baseUrl — адрес сервера Ollama (в тестах можно подставить фейковый); numCtx — null, чтобы взять умолчание. */
+    /** baseUrl — the Ollama server address (tests may pass a fake one); numCtx — null to use the default. */
     public OllamaClient(String baseUrl, String model, Integer numCtx) {
         this.baseUrl = baseUrl;
         this.model = model;
@@ -36,12 +36,12 @@ public class OllamaClient {
     }
 
     /**
-     * Ответ на запрос с инструментами. message — assistant-сообщение как есть (content, thinking, tool_calls):
-     * его целиком возвращаем в историю перед сообщениями с ролью tool.
+     * Response to a request with tools. message — the assistant message as is (content, thinking, tool_calls):
+     * it goes back into the history as a whole, before the messages with role tool.
      */
     public record ToolTurn(JsonNode message, LlmResponse response) {}
 
-    /** Сообщения — сырое JSON-дерево в формате Ollama; system добавляется первым сообщением. */
+    /** Messages are a raw JSON tree in Ollama format; system is added as the first message. */
     public ToolTurn chatWithTools(String system, ArrayNode messages, ArrayNode tools, double temperature)
             throws Exception {
         ArrayNode allMessages = JSON.createArrayNode()

@@ -43,7 +43,7 @@ public class BrokerTools {
     static final String GET_ACCOUNT_SUMMARY = """
             {
               "name": "get_account_summary",
-              "description": "Состояние счёта клиента: деньги в USD и все позиции (тикер, название бумаги, количество). Используй для вопросов «что у меня на счёте», «сколько у меня денег», «сколько у меня бумаг X».",
+              "description": "The client's account state: cash in USD and all positions (ticker, security name, quantity). Use it for questions like 'what is in my account', 'how much cash do I have', 'how many X do I have'.",
               "input_schema": {"type": "object", "properties": {}}
             }
             """;
@@ -51,11 +51,11 @@ public class BrokerTools {
     static final String FIND_SECURITY = """
             {
               "name": "find_security",
-              "description": "Поиск бумаги по тикеру, ISIN или части названия. Возвращает match: EXACT — бумага определена однозначно; CANDIDATES — подходит несколько бумаг: покажи пользователю варианты (тикер и название) и попроси выбрать, сам не выбирай; NOT_FOUND — бумага не найдена, не придумывай тикер. Вызывай перед любым действием с бумагой, если пользователь не назвал точный тикер.",
+              "description": "Find a security by ticker, ISIN or part of its name. Returns match: EXACT — the security is identified unambiguously; CANDIDATES — several securities match: show the user the options (ticker and name) and ask them to choose, do not choose yourself; NOT_FOUND — no security found, do not make up a ticker. Call it before any action with a security if the user did not give an exact ticker.",
               "input_schema": {
                 "type": "object",
                 "properties": {
-                  "query": {"type": "string", "description": "Тикер (TRNC), ISIN (US0000TRNC07) или часть названия (Training) — как написал пользователь"}
+                  "query": {"type": "string", "description": "Ticker (TRNC), ISIN (US0000TRNC07) or part of the name (Training), as the user wrote it"}
                 },
                 "required": ["query"]
               }
@@ -65,11 +65,11 @@ public class BrokerTools {
     static final String GET_QUOTE = """
             {
               "name": "get_quote",
-              "description": "Текущая цена одной бумаги в USD по точному тикеру.",
+              "description": "Current price of one security in USD by exact ticker.",
               "input_schema": {
                 "type": "object",
                 "properties": {
-                  "ticker": {"type": "string", "description": "Точный тикер из результата find_security, например TRNC"}
+                  "ticker": {"type": "string", "description": "Exact ticker from a find_security result, e.g. TRNC"}
                 },
                 "required": ["ticker"]
               }
@@ -83,13 +83,13 @@ public class BrokerTools {
     static final String PLACE_ORDER = """
             {
               "name": "place_order",
-              "description": "Создать заявку на покупку (BUY) или продажу (SELL) бумаги. Заявка НЕ исполняется: она ждёт, пока пользователь подтвердит её в интерфейсе. Возвращает либо созданную заявку (orderId, цена, сумма, остаток денег после сделки), либо отказ с причиной и цифрами. Тикер — только из результата find_security или точно как назвал пользователь.",
+              "description": "Create an order to buy (BUY) or sell (SELL) a security. The order is NOT executed: it waits until the user confirms it in the UI. Returns either the created order (orderId, price, total, cash left after the trade) or a refusal with the reason and numbers. The ticker must come from a find_security result or be exactly as the user named it.",
               "input_schema": {
                 "type": "object",
                 "properties": {
-                  "side":     {"type": "string", "enum": ["BUY", "SELL"], "description": "BUY — покупка, SELL — продажа"},
-                  "ticker":   {"type": "string", "description": "Точный тикер, например DEMO"},
-                  "quantity": {"type": "number", "description": "Количество бумаг в штуках, целое положительное"}
+                  "side":     {"type": "string", "enum": ["BUY", "SELL"], "description": "BUY to buy, SELL to sell"},
+                  "ticker":   {"type": "string", "description": "Exact ticker, e.g. DEMO"},
+                  "quantity": {"type": "number", "description": "Number of shares, a whole positive number"}
                 },
                 "required": ["side", "ticker", "quantity"]
               }
@@ -100,7 +100,7 @@ public class BrokerTools {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    private static final String TICKER_REQUIRED = "Аргумент ticker обязателен: непустая строка с точным тикером";
+    private static final String TICKER_REQUIRED = "Argument ticker is required: a non-empty string with the exact ticker";
 
     private final BrokerService broker;
     private final ArrayNode definitions;
@@ -112,7 +112,7 @@ public class BrokerTools {
             try {
                 definitions.add(JSON.readTree(definition));
             } catch (JsonProcessingException e) {
-                throw new IllegalStateException("Битое определение инструмента: " + definition, e);
+                throw new IllegalStateException("Malformed tool definition: " + definition, e);
             }
         }
     }
@@ -129,7 +129,7 @@ public class BrokerTools {
             case "find_security" -> findSecurity(call);
             case "get_quote" -> getQuote(call);
             case "place_order" -> placeOrder(accountId, call);
-            default -> ToolResult.error(call, "Неизвестный инструмент " + call.name());
+            default -> ToolResult.error(call, "Unknown tool " + call.name());
         };
     }
 
@@ -137,7 +137,7 @@ public class BrokerTools {
     private ToolResult getAccountSummary(String accountId, ToolCall call) {
         Optional<Account> optAccount = broker.accountById(accountId);
         if (optAccount.isEmpty()) {
-            return ToolResult.error(call, "Счёт не найден");
+            return ToolResult.error(call, "Account not found");
         }
         Account account = optAccount.get();
 
@@ -170,7 +170,7 @@ public class BrokerTools {
         JsonNode args = argumentsOf(call);
         JsonNode queryNode = args.path("query");
         if (!queryNode.isTextual()) {
-            return ToolResult.error(call, "Аргумент query обязателен: строка с тикером, ISIN или частью названия");
+            return ToolResult.error(call, "Argument query is required: a string with a ticker, ISIN or part of a name");
         }
 
         SearchResult result = broker.findSecurity(queryNode.asText());
@@ -211,7 +211,7 @@ public class BrokerTools {
 
         Optional<Security> security = broker.securityByTicker(ticker);
         if (security.isEmpty()) {
-            return ToolResult.error(call, "Бумага с тикером " + ticker + " не найдена. Найди её через find_security");
+            return ToolResult.error(call, "Security with ticker " + ticker + " not found. Find it with find_security");
         }
 
         Map<String, Object> view = new LinkedHashMap<>();
@@ -232,7 +232,7 @@ public class BrokerTools {
 
         OrderSide side = parseSide(args.path("side"));
         if (side == null) {
-            return ToolResult.error(call, "Аргумент side обязателен и должен быть BUY или SELL");
+            return ToolResult.error(call, "Argument side is required and must be BUY or SELL");
         }
         String ticker = tickerOf(args);
         if (ticker.isEmpty()) {
@@ -240,7 +240,7 @@ public class BrokerTools {
         }
         JsonNode quantityNode = args.path("quantity");
         if (quantityNode.isMissingNode() || quantityNode.isNull()) {
-            return ToolResult.error(call, "Аргумент quantity обязателен: целое положительное число");
+            return ToolResult.error(call, "Argument quantity is required: a whole positive number");
         }
 
         return toToolResult(call, decide(accountId, side, ticker, quantityNode));
@@ -259,7 +259,7 @@ public class BrokerTools {
         return switch (decision) {
             case OrderDecision.Created created -> ToolResult.ok(call, toJson(createdView(created)));
             case OrderDecision.Refused refused -> ToolResult.ok(call, toJson(refusedView(refused)));
-            default -> ToolResult.error(call, "Неожиданный результат создания заявки: " + decision);
+            default -> ToolResult.error(call, "Unexpected order creation result: " + decision);
         };
     }
 

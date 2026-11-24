@@ -3,8 +3,8 @@ package ai.lab.broker.domain;
 import java.util.List;
 
 /**
- * Результат поиска бумаги. EXACT — ровно одна бумага (точный тикер/ISIN или единственное совпадение по названию),
- * CANDIDATES — несколько подходящих, нужно спросить пользователя, NOT_FOUND — ничего.
+ * Result of a security search. EXACT — exactly one security (exact ticker/ISIN or the only name match);
+ * CANDIDATES — several match and the user must choose; NOT_FOUND — nothing matches (the list is empty).
  */
 public record SearchResult(Match match, List<Security> securities) {
 

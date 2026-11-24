@@ -20,6 +20,6 @@ class TraceController {
 
     @GetMapping("/traces/{id}")
     Trace trace(@PathVariable String id) {
-        return traces.find(id).orElseThrow(() -> new NoSuchElementException("Трасса " + id + " не найдена"));
+        return traces.find(id).orElseThrow(() -> new NoSuchElementException("Trace " + id + " not found"));
     }
 }

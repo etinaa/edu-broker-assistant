@@ -33,9 +33,9 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         for (String argument : IDENTIFIER_ARGUMENTS) {
             String value = call.arguments().path(argument).asText();
             if (!value.isEmpty() && !wasSeen(value)) {
-                return ToolResult.error(call, "Значение " + argument + "='" + value + "' не встречается ни в сообщениях "
-                        + "пользователя, ни в результатах инструментов. Не подставляй и не исправляй идентификаторы — "
-                        + "найди бумагу через find_security или уточни у пользователя.");
+                return ToolResult.error(call, "Value " + argument + "='" + value + "' appears neither in the user's messages "
+                        + "nor in tool results. Do not substitute or correct identifiers: "
+                        + "find the security with find_security or ask the user.");
             }
         }
         ToolResult result = delegate.apply(call);

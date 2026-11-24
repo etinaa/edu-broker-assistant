@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/** In-memory security catalog with the demo securities. Lookup by ticker or ISIN is case-insensitive. */
 @Component
 public class SecurityCatalog {
 

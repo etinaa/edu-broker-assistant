@@ -40,14 +40,14 @@ public class ClaudeClient {
     }
 
     /**
-     * Ответ на запрос с инструментами. content — блоки ответа как есть (text, tool_use): их целиком
-     * нужно вернуть в историю assistant-сообщением, иначе tool_result не к чему будет привязать.
+     * Response to a request with tools. content — the response blocks as is (text, tool_use): they must be added
+     * back to the history as a whole assistant message, otherwise tool_result has nothing to refer to.
      */
     public record ToolTurn(JsonNode content, LlmResponse response) {
     }
 
     /**
-     * toolChoice — поле tool_choice как есть (auto/any/tool/none, disable_parallel_tool_use); null — не передавать.
+     * toolChoice — the tool_choice field as is (auto/any/tool/none, disable_parallel_tool_use); null — omit it.
      */
     public ToolTurn chatWithTools(String system, ArrayNode messages, ArrayNode tools, JsonNode toolChoice,
                                   double temperature) throws Exception {
@@ -99,7 +99,7 @@ public class ClaudeClient {
     }
 
     /**
-     * content — массив блоков; текст собирается из блоков type=text.
+     * content — an array of blocks; the text is joined from blocks of type=text.
      */
     private static String extractText(JsonNode contentBlocks) {
         StringBuilder text = new StringBuilder();

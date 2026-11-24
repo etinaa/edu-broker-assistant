@@ -5,16 +5,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 
 /**
- * Диалог с инструментами независимо от провайдера (перенесено из урока 1.4). Реализация хранит историю в
- * формате своего API (блоки tool_use/tool_result у Claude, tool_calls и роль tool у Ollama), а цикл видит
- * только запросы на вызов и результаты.
+ * Provider-independent tool conversation (carried over from lesson 1.4). An implementation keeps the history in
+ * its API's format (tool_use/tool_result blocks for Claude, tool_calls and the tool role for Ollama), while the
+ * loop sees only call requests and results.
  * <p>
- * Отличие от урока 1.4: диалог живёт дольше одного вопроса — это сессия пользователя. Поэтому первый вопрос
- * не передаётся в конструктор, а каждое новое сообщение добавляется через {@link #addUserMessage(String)}.
+ * Unlike lesson 1.4, a conversation outlives a single question: it is the user's session. So the first question
+ * is not passed to the constructor; every new message is added with {@link #addUserMessage(String)}.
  */
 public interface ToolConversation {
 
-    /** Запрос модели на вызов инструмента; id — null, если провайдер его не прислал. */
+    /** The model's request to call a tool; id is null if the provider did not send one. */
     record ToolCall(String id, String name, JsonNode arguments) {
         @Override
         public String toString() {
@@ -22,7 +22,7 @@ public interface ToolConversation {
         }
     }
 
-    /** error — результат описывает ошибку (у Claude уходит как is_error: true, у Ollama — пометкой в тексте). */
+    /** error — the result describes an error (sent as is_error: true to Claude, as a text marker to Ollama). */
     record ToolResult(ToolCall call, String content, boolean error) {
         public static ToolResult ok(ToolCall call, String content) {
             return new ToolResult(call, content, false);
@@ -33,20 +33,21 @@ public interface ToolConversation {
         }
     }
 
-    /** Ответ модели на одном шаге: пустой calls — модель ответила текстом, цикл закончен. */
+    /** The model's reply on one step: empty calls means the model answered with text and the loop is done. */
     record Turn(List<ToolCall> calls, LlmResponse response) {}
 
-    /** Новое сообщение пользователя в историю сессии. */
+    /** Adds a new user message to the session history. */
     void addUserMessage(String text);
 
-    /** Отправить историю модели; ответ модели добавляется в историю целиком. */
+    /** Sends the history to the model; the model's reply is added to the history as a whole. */
     Turn send() throws Exception;
 
-    /** Результаты всех вызовов одного шага — одним сообщением или по сообщению на вызов, как требует провайдер. */
+    /** Adds the results of all calls of one step: in one message or one per call, as the provider requires. */
     void addToolResults(List<ToolResult> results);
 
-    /** Сколько сообщений в истории — пригодится для лимита истории сессии. */
+    /** Number of messages in the history; useful for the session history limit. */
     int size();
 
+    /** Provider and model name, for traces. */
     String name();
 }

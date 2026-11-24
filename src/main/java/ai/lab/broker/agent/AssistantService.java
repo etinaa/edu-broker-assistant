@@ -44,7 +44,7 @@ public class AssistantService {
      * Исключения провайдера (сеть, 429, 5xx) — не стек пользователю, а понятная ошибка API.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
-        throw new UnsupportedOperationException("Задание 4: AssistantService.chat");
+        throw new UnsupportedOperationException("Task 4: AssistantService.chat");
     }
 
     /** Новая сессия с чистой историей. */

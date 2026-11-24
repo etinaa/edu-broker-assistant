@@ -5,6 +5,10 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+/**
+ * Order to buy or sell a security, priced when it is created. Starts as PENDING_CONFIRMATION;
+ * reason explains the latest status change.
+ */
 @Getter
 public class Order {
 

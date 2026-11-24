@@ -1,6 +1,6 @@
 package ai.lab.broker.llm;
 
-/** Нормализованный ответ модели: текст + то, за что мы платим и чего ждём. cost — USD строкой (у Ollama "0"). */
+/** Normalized model response: the text plus what we pay for and wait for. cost — USD as a string ("0" for Ollama). */
 public record LlmResponse(String text, int inputTokens, int outputTokens, long latencyMs,
                           String stopReason, String cost) {
 

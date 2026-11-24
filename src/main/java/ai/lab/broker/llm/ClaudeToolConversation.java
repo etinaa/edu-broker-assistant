@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Диалог с инструментами на Claude: запрос на вызов — блок tool_use, результаты — блоки tool_result в user-сообщении. */
+/** Tool conversation on Claude: a call request is a tool_use block, results are tool_result blocks in a user message. */
 public final class ClaudeToolConversation implements ToolConversation {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -21,8 +21,8 @@ public final class ClaudeToolConversation implements ToolConversation {
     private final ArrayNode messages = JSON.createArrayNode();
 
     /**
-     * tools — определения в формате Claude (name, description, input_schema).
-     * toolChoice — поле tool_choice как есть; null — по умолчанию (auto).
+     * tools — definitions in Claude format (name, description, input_schema).
+     * toolChoice — the tool_choice field as is; null — the default (auto).
      */
     public ClaudeToolConversation(ClaudeClient claude, String system, ArrayNode tools, JsonNode toolChoice,
                                   double temperature) {
@@ -52,7 +52,7 @@ public final class ClaudeToolConversation implements ToolConversation {
         return new Turn(calls, turn.response());
     }
 
-    /** Все результаты шага — одним user-сообщением; tool_use_id связывает каждый с его вызовом. */
+    /** All results of a step go in one user message; tool_use_id links each result to its call. */
     @Override
     public void addToolResults(List<ToolResult> results) {
         ArrayNode content = JSON.createArrayNode();

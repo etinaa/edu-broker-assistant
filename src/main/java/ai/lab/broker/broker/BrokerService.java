@@ -99,8 +99,9 @@ public class BrokerService {
 
     /**
      * Task 1 (basic execution) and task 6 (repeated checks). Only for PENDING_CONFIRMATION:
-     * re-check the cash or the position; on success update the account and return EXECUTED, on failure — FAILED
-     * with the reason. A repeated confirm must not change the account a second time.
+     * re-check the cash or the position at the current price; on success update the account, mark the order
+     * EXECUTED and return Confirmed; on failure mark it FAILED and return Refused with the reason.
+     * A repeated confirm is Refused and does not change the account a second time.
      */
     public synchronized OrderDecision confirmOrder(String accountId, String orderId) {
         Optional<Order> optOrder = orderById(orderId);

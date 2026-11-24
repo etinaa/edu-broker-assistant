@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
 
-/** Настройки моделей из {@code application.yml}, раздел {@code llm}. */
+/** Model settings from the {@code llm} section of {@code application.yml}. */
 @ConfigurationProperties(prefix = "llm")
 public record LlmProperties(Provider provider, Claude claude, Ollama ollama) {
 

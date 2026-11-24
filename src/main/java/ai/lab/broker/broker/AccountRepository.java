@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/** In-memory accounts, seeded with the demo accounts BRK-1 and BRK-2 on startup. Lookup by id is case-sensitive. */
 @Component
 public class AccountRepository {
 

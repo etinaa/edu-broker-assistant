@@ -53,7 +53,7 @@ public final class ToolLoop {
         try {
             return executor.apply(call);
         } catch (RuntimeException e) {
-            return ToolResult.error(call, "Внутренняя ошибка инструмента " + call.name() + ": " + e.getMessage());
+            return ToolResult.error(call, "Internal error in tool " + call.name() + ": " + e.getMessage());
         }
     }
 }

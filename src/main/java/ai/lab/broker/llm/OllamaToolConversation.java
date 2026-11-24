@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Диалог с инструментами на Ollama: запрос на вызов — message.tool_calls (done_reason при этом обычный "stop",
- * так что признак вызова — только наличие tool_calls), результаты — по сообщению с ролью tool на каждый вызов.
+ * Tool conversation on Ollama: a call request is message.tool_calls (done_reason is still a plain "stop", so only
+ * the presence of tool_calls signals a call); results are one message with role tool per call.
  */
 public final class OllamaToolConversation implements ToolConversation {
 
@@ -22,7 +22,7 @@ public final class OllamaToolConversation implements ToolConversation {
     private final double temperature;
     private final ArrayNode messages = JSON.createArrayNode();
 
-    /** tools — определения в формате Claude; переводятся в формат Ollama здесь. */
+    /** tools — definitions in Claude format; they are converted to Ollama format here. */
     public OllamaToolConversation(OllamaClient ollama, String system, ArrayNode claudeTools, double temperature) {
         this.ollama = ollama;
         this.system = system;
@@ -31,7 +31,7 @@ public final class OllamaToolConversation implements ToolConversation {
         claudeTools.forEach(tool -> tools.add(toOllamaTool(tool)));
     }
 
-    /** Тот же инструмент в формате Ollama: обёртка type=function, а input_schema называется parameters. */
+    /** The same tool in Ollama format: wrapped in type=function, with input_schema renamed to parameters. */
     static ObjectNode toOllamaTool(JsonNode claudeTool) {
         ObjectNode tool = JSON.createObjectNode().put("type", "function");
         tool.putObject("function")
@@ -61,8 +61,8 @@ public final class OllamaToolConversation implements ToolConversation {
     }
 
     /**
-     * По сообщению на вызов, в том же порядке, что и tool_calls; id вызова Ollama не требует — только tool_name.
-     * Флага ошибки у роли tool нет, поэтому ошибка видна модели только по тексту.
+     * One message per call, in the same order as tool_calls; Ollama needs no call id, only tool_name.
+     * The tool role has no error flag, so the model can see an error only from the text.
      */
     @Override
     public void addToolResults(List<ToolResult> results) {
@@ -70,7 +70,7 @@ public final class OllamaToolConversation implements ToolConversation {
             messages.add(JSON.createObjectNode()
                     .put("role", "tool")
                     .put("tool_name", result.call().name())
-                    .put("content", result.error() ? "ОШИБКА: " + result.content() : result.content()));
+                    .put("content", result.error() ? "ERROR: " + result.content() : result.content()));
         }
     }
 

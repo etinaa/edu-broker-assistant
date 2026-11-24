@@ -239,11 +239,11 @@ class OllamaToolConversationTest {
         ToolCall call = new ToolCall(null, "find_security", JSON.createObjectNode());
         OllamaToolConversation conv = conversation();
 
-        conv.addToolResults(List.of(ToolResult.error(call, "не найдено")));
+        conv.addToolResults(List.of(ToolResult.error(call, "not found")));
         conv.send();
 
         JsonNode msg = calls.getFirst().messages().get(0);
-        assertEquals("ОШИБКА: не найдено", msg.path("content").asText());
+        assertEquals("ERROR: not found", msg.path("content").asText());
         assertEquals("find_security", msg.path("tool_name").asText());
     }
 

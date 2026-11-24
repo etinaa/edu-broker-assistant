@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+/** In-memory orders by id. Ids are generated in sequence: ORD-1, ORD-2, … */
 @Component
 public class OrderBook {
 

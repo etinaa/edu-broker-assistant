@@ -1,14 +1,15 @@
 package ai.lab.broker.domain;
 
+/** Lifecycle of an order: created by the agent, then decided by a human. */
 public enum OrderStatus {
-    /** Заявка создана агентом и ждёт решения человека. Деньги и бумаги не тронуты. */
+    /** Created by the agent and waiting for the user's decision. Cash and positions are untouched. */
     PENDING_CONFIRMATION,
-    /** Подтверждена и исполнена: деньги и позиция изменились. */
+    /** Confirmed and executed: cash and the position have changed. */
     EXECUTED,
-    /** Пользователь отказался. */
+    /** Rejected by the user. */
     REJECTED_BY_USER,
-    /** Подтверждение пришло, но повторная проверка не прошла (денег или бумаг уже не хватает). */
+    /** Confirmed, but the re-check at confirm time failed (not enough cash or securities any more). */
     FAILED,
-    /** Не подтверждена вовремя (задание 6в). */
+    /** Not confirmed in time (task 6c). */
     EXPIRED
 }
