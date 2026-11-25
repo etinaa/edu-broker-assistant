@@ -69,8 +69,16 @@ public class BrokerService {
                 .map(account -> new Account(account.getId(), account.getCash(), account.getPositions()));
     }
 
-    /** The order with its status as of now: a pending order past its lifetime is marked EXPIRED first. */
+    /**
+     * A snapshot of the order as of now, taken under the lock: a pending order past its lifetime is marked EXPIRED
+     * first. Later changes do not show in the snapshot; read the order again to see them.
+     */
     public synchronized Optional<Order> orderById(String orderId) {
+        return liveOrder(orderId).map(Order::snapshot);
+    }
+
+    /** The stored order itself, for changes under the lock; never handed out. */
+    private Optional<Order> liveOrder(String orderId) {
         Optional<Order> order = orders.byId(orderId);
         order.ifPresent(this::expireIfOverdue);
         return order;
@@ -127,7 +135,7 @@ public class BrokerService {
         BigDecimal cashAfter = side == OrderSide.BUY
                 ? account.getCash().subtract(total)
                 : account.getCash().add(total);
-        return new OrderDecision.Created(order, cashAfter);
+        return new OrderDecision.Created(order.snapshot(), cashAfter);
     }
 
     private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {
@@ -144,7 +152,7 @@ public class BrokerService {
      * A repeated confirm is Refused and does not change the account a second time.
      */
     public synchronized OrderDecision confirmOrder(String accountId, String orderId) {
-        Optional<Order> optOrder = orderById(orderId);
+        Optional<Order> optOrder = liveOrder(orderId);
         if (optOrder.isEmpty()) {
             return OrderDecision.Refused.orderNotFound(orderId);
         }
@@ -188,7 +196,7 @@ public class BrokerService {
         }
 
         order.setStatus(OrderStatus.EXECUTED, "Order confirmed at " + price.toPlainString() + " USD");
-        return new OrderDecision.Confirmed(order);
+        return new OrderDecision.Confirmed(order.snapshot());
     }
 
     /** BUY: the price rose by more than allowed; SELL: it fell by more than allowed. Exactly at the limit is fine. */
@@ -209,7 +217,7 @@ public class BrokerService {
 
     /** Task 1. Reject an order: PENDING_CONFIRMATION → REJECTED_BY_USER, other statuses are left unchanged. */
     public synchronized OrderDecision rejectOrder(String accountId, String orderId) {
-        Optional<Order> optOrder = orderById(orderId);
+        Optional<Order> optOrder = liveOrder(orderId);
         if (optOrder.isEmpty()) {
             return OrderDecision.Refused.orderNotFound(orderId);
         }
@@ -227,8 +235,7 @@ public class BrokerService {
             return OrderDecision.Refused.cannotReject(order.getStatus());
         }
 
-        Order canceledOrder = cancelOrder(order);
-        return new OrderDecision.Rejected(canceledOrder);
+        return new OrderDecision.Rejected(cancelOrder(order).snapshot());
     }
 
     private Order cancelOrder(Order order) {

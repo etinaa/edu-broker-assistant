@@ -40,6 +40,11 @@ class BrokerServiceTest {
         assertEquals(0, new BigDecimal(expected).compareTo(actual), "expected " + expected + " but was " + actual);
     }
 
+    /** BrokerService hands out snapshots: read the order again to see what happened to it since. */
+    private Order current(Order order) {
+        return service.orderById(order.getId()).orElseThrow();
+    }
+
     private Order placeOk(String accountId, OrderSide side, String ticker, long qty) {
         OrderDecision d = service.placeOrder(accountId, side, ticker, qty);
         return assertInstanceOf(OrderDecision.Created.class, d).order();
@@ -130,7 +135,20 @@ class BrokerServiceTest {
         assertTrue(service.orderById("ORD-1").isEmpty());
 
         Order o = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
-        assertSame(o, service.orderById(o.getId()).orElseThrow());
+        assertEquals(o.getId(), service.orderById(o.getId()).orElseThrow().getId());
+    }
+
+    @Test
+    void ordersAreHandedOutAsSnapshotsThatLaterChangesDoNotTouch() {
+        Order placed = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
+        Order read = service.orderById(placed.getId()).orElseThrow();
+
+        service.confirmOrder("BRK-1", placed.getId());
+
+        assertNotSame(orders.byId(placed.getId()).orElseThrow(), read);
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, read.getStatus());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, placed.getStatus());
+        assertEquals(OrderStatus.EXECUTED, current(placed).getStatus());
     }
 
     @Test
@@ -162,7 +180,7 @@ class BrokerServiceTest {
         assertEquals(Reason.INSUFFICIENT_FUNDS, refusedReason(d));
         assertMoney("2300.00", ((OrderDecision.Refused) d).shortfall());
         assertMoney("3850.00", service.accountById("BRK-1").orElseThrow().getCash());
-        assertEquals(OrderStatus.FAILED, second.getStatus());
+        assertEquals(OrderStatus.FAILED, current(second).getStatus());
     }
 
     @Test
@@ -173,7 +191,7 @@ class BrokerServiceTest {
         assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
 
         assertMoney("5818.00", service.accountById("BRK-1").orElseThrow().getCash()); // 10000 - 10 * 418.20
-        assertEquals("Order confirmed at 418.20 USD", order.getReason());
+        assertEquals("Order confirmed at 418.20 USD", current(order).getReason());
     }
 
     @Test
@@ -186,7 +204,7 @@ class BrokerServiceTest {
         assertEquals(Reason.PRICE_CHANGED, refusedReason(d));
         assertEquals("Price of DEMO moved from 410.00 to 418.21 USD, more than the allowed 2%; place a new order",
                 refusedMessage(d));
-        assertEquals(OrderStatus.FAILED, order.getStatus());
+        assertEquals(OrderStatus.FAILED, current(order).getStatus());
         Account account = service.accountById("BRK-1").orElseThrow();
         assertMoney("10000.00", account.getCash());
         assertEquals(5L, account.quantityByTicker("DEMO"));
@@ -231,7 +249,7 @@ class BrokerServiceTest {
         OrderDecision d = service.confirmOrder("BRK-1", order.getId());
 
         assertEquals(Reason.ORDER_EXPIRED, refusedReason(d));
-        assertEquals(OrderStatus.EXPIRED, order.getStatus());
+        assertEquals(OrderStatus.EXPIRED, current(order).getStatus());
         assertEquals("Can't reject order with status = EXPIRED",
                 refusedMessage(service.rejectOrder("BRK-1", order.getId())));
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
@@ -258,7 +276,7 @@ class BrokerServiceTest {
 
         OrderDecision.Created created = assertInstanceOf(OrderDecision.Created.class, d);
         Order order = created.order();
-        assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, current(order).getStatus());
         assertEquals("BRK-1", order.getAccountId());
         assertEquals(OrderSide.BUY, order.getSide());
         assertEquals(10, order.getQuantity());
@@ -268,7 +286,7 @@ class BrokerServiceTest {
         Account account = service.accountById("BRK-1").orElseThrow();
         assertMoney("10000.00", account.getCash());
         assertEquals(20L, account.quantityByTicker("TRNC"));
-        assertSame(order, orders.byId(order.getId()).orElseThrow());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, orders.byId(order.getId()).orElseThrow().getStatus());
     }
 
     @Test
@@ -448,7 +466,7 @@ class BrokerServiceTest {
         Account account = service.accountById("BRK-1").orElseThrow();
         assertMoney("10741.00", account.getCash());
         assertEquals(16L, account.quantityByTicker("TRNC"));
-        assertEquals(OrderStatus.EXECUTED, order.getStatus());
+        assertEquals(OrderStatus.EXECUTED, current(order).getStatus());
     }
 
     @Test
@@ -480,8 +498,8 @@ class BrokerServiceTest {
         Account account = service.accountById("BRK-2").orElseThrow();
         assertMoney("1.60", account.getCash());
         assertEquals(18L, account.quantityByTicker("SMPL"));
-        assertEquals(OrderStatus.FAILED, second.getStatus());
-        assertEquals(d instanceof OrderDecision.Refused r ? r.message() : null, second.getReason());
+        assertEquals(OrderStatus.FAILED, current(second).getStatus());
+        assertEquals(d instanceof OrderDecision.Refused r ? r.message() : null, current(second).getReason());
     }
 
     @Test
@@ -494,7 +512,7 @@ class BrokerServiceTest {
 
         assertEquals(Reason.INSUFFICIENT_POSITION, refusedReason(d));
         assertEquals(2L, service.accountById("BRK-2").orElseThrow().quantityByTicker("SMPL"));
-        assertEquals(OrderStatus.FAILED, second.getStatus());
+        assertEquals(OrderStatus.FAILED, current(second).getStatus());
     }
 
     @Test
@@ -518,7 +536,7 @@ class BrokerServiceTest {
         OrderDecision d = service.confirmOrder("BRK-1", ghost.getId());
 
         assertEquals(Reason.UNKNOWN_SECURITY, refusedReason(d));
-        assertEquals(OrderStatus.FAILED, ghost.getStatus());
+        assertEquals(OrderStatus.FAILED, current(ghost).getStatus());
         assertMoney("10000.00", account.getCash());
         assertEquals(0L, account.quantityByTicker("GHOST"));
     }
@@ -539,7 +557,7 @@ class BrokerServiceTest {
 
         assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(d));
         assertEquals("Order " + order.getId() + " not found", refusedMessage(d));
-        assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, current(order).getStatus());
     }
 
     @Test
@@ -552,7 +570,7 @@ class BrokerServiceTest {
         assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(d));
         assertEquals("Order " + order.getId() + " not found", refusedMessage(d));
 
-        assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, current(order).getStatus());
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
         assertMoney("100.00", service.accountById("BRK-2").orElseThrow().getCash());
     }
@@ -566,7 +584,7 @@ class BrokerServiceTest {
 
         assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
         assertEquals("Can't confirm order with status = REJECTED_BY_USER", refusedMessage(d));
-        assertEquals(OrderStatus.REJECTED_BY_USER, order.getStatus());
+        assertEquals(OrderStatus.REJECTED_BY_USER, current(order).getStatus());
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
     }
 
@@ -594,7 +612,7 @@ class BrokerServiceTest {
 
         assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
         assertEquals("Can't reject order with status = EXECUTED", refusedMessage(d));
-        assertEquals(OrderStatus.EXECUTED, order.getStatus());
+        assertEquals(OrderStatus.EXECUTED, current(order).getStatus());
     }
 
     @Test
@@ -621,7 +639,7 @@ class BrokerServiceTest {
         assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(foreignAccount));
         assertEquals("Order ORD-999 not found", refusedMessage(unknownOrder));
         assertEquals("Order " + order.getId() + " not found", refusedMessage(foreignAccount));
-        assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, current(order).getStatus());
     }
 
     // ---- findSecurity ----

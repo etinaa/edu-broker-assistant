@@ -7,7 +7,8 @@ import java.time.Instant;
 
 /**
  * Order to buy or sell a security, priced when it is created. Starts as PENDING_CONFIRMATION;
- * reason explains the latest status change.
+ * reason explains the latest status change. Not synchronized by itself: BrokerService changes it under its lock
+ * and gives callers {@link #snapshot() snapshots}.
  */
 @Getter
 public class Order {
@@ -33,6 +34,20 @@ public class Order {
         this.price = price;
         this.status = OrderStatus.PENDING_CONFIRMATION;
         this.reason = "";
+    }
+
+    private Order(Order source) {
+        this(source.id, source.accountId, source.side, source.ticker, source.quantity, source.price, source.createdAt);
+        this.status = source.status;
+        this.reason = source.reason;
+    }
+
+    /**
+     * A copy with the current status and reason. BrokerService hands out copies taken under its lock, so a reader
+     * (JSON serialization, the chat response) never sees a status together with the reason of another one.
+     */
+    public Order snapshot() {
+        return new Order(this);
     }
 
     public BigDecimal total() {
