@@ -3,3 +3,5 @@
 *.log
 # Local secrets (ANTHROPIC_API_KEY); .env.example is the template.
 .env
+# Experiment reports: they hold account data from traces and logs.
+/experiments/results/
