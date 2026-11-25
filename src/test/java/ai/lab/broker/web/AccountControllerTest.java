@@ -39,7 +39,7 @@ class AccountControllerTest {
 
     @Test
     void accountReturnsIdCashAndPositions() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(
+        when(broker.accountSnapshot("BRK-1")).thenReturn(Optional.of(
                 new Account("BRK-1", new BigDecimal("10000.00"), Map.of("TRNC", 20L))));
 
         mvc.perform(get("/accounts/BRK-1").header("X-Account-Id", "BRK-1"))
@@ -51,7 +51,7 @@ class AccountControllerTest {
 
     @Test
     void accountReturns404ProblemDetailWhenNotFound() throws Exception {
-        when(broker.accountById("nope")).thenReturn(Optional.empty());
+        when(broker.accountSnapshot("nope")).thenReturn(Optional.empty());
 
         mvc.perform(get("/accounts/nope").header("X-Account-Id", "nope"))
                 .andExpect(status().isNotFound())
@@ -61,7 +61,7 @@ class AccountControllerTest {
 
     @Test
     void anotherAccountIs404LikeAMissingOne() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(
+        when(broker.accountSnapshot("BRK-1")).thenReturn(Optional.of(
                 new Account("BRK-1", new BigDecimal("10000.00"), Map.of("TRNC", 20L))));
 
         mvc.perform(get("/accounts/BRK-1").header("X-Account-Id", "BRK-2"))

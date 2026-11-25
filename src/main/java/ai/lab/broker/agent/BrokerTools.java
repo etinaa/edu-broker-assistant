@@ -135,7 +135,7 @@ public class BrokerTools {
 
     /** Деньги и позиции счёта без номера счёта; название бумаги — из справочника. Нулевые позиции не показываем. */
     private ToolResult getAccountSummary(String accountId, ToolCall call) {
-        Optional<Account> optAccount = broker.accountById(accountId);
+        Optional<Account> optAccount = broker.accountSnapshot(accountId);
         if (optAccount.isEmpty()) {
             return ToolResult.error(call, "Account not found");
         }

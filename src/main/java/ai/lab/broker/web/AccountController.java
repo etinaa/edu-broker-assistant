@@ -25,7 +25,7 @@ class AccountController {
     @GetMapping("/accounts/{accountId}")
     Account account(@RequestHeader(ChatController.ACCOUNT_HEADER) String callerAccountId,
                     @PathVariable String accountId) {
-        return broker.accountById(accountId)
+        return broker.accountSnapshot(accountId)
                 .filter(account -> account.getId().equals(callerAccountId))
                 .orElseThrow(() -> new NoSuchElementException("Account " + accountId + " not found"));
     }

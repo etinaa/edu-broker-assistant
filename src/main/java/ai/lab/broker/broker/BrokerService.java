@@ -39,6 +39,15 @@ public class BrokerService {
         return accounts.byId(accountId);
     }
 
+    /**
+     * A copy of the account taken under the service lock, for reading only: cash and positions are consistent with
+     * each other and with the last completed operation, even while a confirmation is changing the account.
+     */
+    public synchronized Optional<Account> accountSnapshot(String accountId) {
+        return accountById(accountId)
+                .map(account -> new Account(account.getId(), account.getCash(), account.getPositions()));
+    }
+
     public Optional<Order> orderById(String orderId) {
         return orders.byId(orderId);
     }

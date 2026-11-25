@@ -129,6 +129,21 @@ class BrokerServiceTest {
         assertSame(o, service.orderById(o.getId()).orElseThrow());
     }
 
+    @Test
+    void accountSnapshotIsACopyThatLaterOperationsDoNotChange() {
+        Account snapshot = service.accountSnapshot("BRK-1").orElseThrow();
+        Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 2);
+        service.confirmOrder("BRK-1", order.getId());
+
+        assertMoney("10000.00", snapshot.getCash());
+        assertEquals(20L, snapshot.quantityByTicker("TRNC"));
+        Account after = service.accountSnapshot("BRK-1").orElseThrow();
+        assertMoney("9629.50", after.getCash());
+        assertEquals(22L, after.quantityByTicker("TRNC"));
+        assertNotSame(service.accountById("BRK-1").orElseThrow(), after);
+        assertTrue(service.accountSnapshot("nope").isEmpty());
+    }
+
     // ---- placeOrder ----
 
     @Test
