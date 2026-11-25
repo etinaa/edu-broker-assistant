@@ -136,6 +136,19 @@ public final class ScriptedConversationFactory implements ToolConversationFactor
         }
 
         @Override
+        public String groundingText() {
+            StringBuilder text = new StringBuilder();
+            for (Object entry : history) {
+                if (entry instanceof String message) {
+                    text.append(message).append('\n');
+                } else if (entry instanceof ToolResult result && !result.error()) {
+                    text.append(result.content()).append('\n');
+                }
+            }
+            return text.toString();
+        }
+
+        @Override
         public int size() {
             return history.size();
         }

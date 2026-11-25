@@ -68,7 +68,11 @@ public class AssistantService {
      *   <li>The session's conversation is locked for the whole request, so two parallel messages of one session
      *       cannot interleave in its history.</li>
      *   <li>Before the new message, the history is trimmed to the session limit ({@link SessionStore#fitHistory}).</li>
-     *   <li>The executor is created per request and closes over accountId.</li>
+     *   <li>The executor is created per request and closes over accountId. It is wrapped in a
+     *       {@link GroundedExecutor}: a ticker must appear in the user's messages or the successful tool results of
+     *       this session (as far as the history still holds them), otherwise the call is rejected without running.
+     *       The whole session counts, not just this message: "buy 100 Sample" → candidates → "Logistics" places
+     *       SMPL, which came from the previous message's find_security.</li>
      *   <li>When the step limit is reached, the answer is an honest "could not finish", not a fragment of the
      *       model's text.</li>
      *   <li>pendingOrder and candidates are built from this message's tool results, not from the model's text.</li>
@@ -89,11 +93,11 @@ public class AssistantService {
             List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
             try {
-                result = runLoop(conversation, call -> {
+                result = runLoop(conversation, new GroundedExecutor(conversation.groundingText(), call -> {
                     ToolResult toolResult = tools.execute(accountId, call);
                     executed.add(toolResult);
                     return toolResult;
-                });
+                }));
             } catch (RuntimeException e) {
                 conversation.truncate(sizeBefore);
                 cancelCreatedOrders(accountId, executed);

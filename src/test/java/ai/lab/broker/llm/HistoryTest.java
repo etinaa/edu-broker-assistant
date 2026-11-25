@@ -91,6 +91,42 @@ class HistoryTest {
     }
 
     @Test
+    void claudeGroundingTextHasUserTextAndSuccessfulResultsOnly() throws Exception {
+        ArrayNode messages = messages("""
+                [
+                  {"role":"user","content":"buy Tesla"},
+                  {"role":"assistant","content":[{"type":"text","text":"Did you mean TSLA?"},
+                                                  {"type":"tool_use","id":"t1","name":"get_quote","input":{}}]},
+                  {"role":"user","content":[
+                    {"type":"tool_result","tool_use_id":"t1","content":"Unknown ticker TSLA","is_error":true},
+                    {"type":"tool_result","tool_use_id":"t2","content":"{\\"ticker\\":\\"SMPL\\"}"}]}
+                ]""");
+
+        String text = History.groundingText(messages);
+
+        assertTrue(text.contains("buy Tesla"));
+        assertTrue(text.contains("SMPL"));
+        assertFalse(text.contains("TSLA"));
+    }
+
+    @Test
+    void ollamaGroundingTextSkipsAssistantAndErrorResults() throws Exception {
+        ArrayNode messages = messages("""
+                [
+                  {"role":"user","content":"buy Tesla"},
+                  {"role":"assistant","content":"Did you mean TSLA?"},
+                  {"role":"tool","tool_name":"get_quote","content":"ERROR: Unknown ticker TSLA"},
+                  {"role":"tool","tool_name":"find_security","content":"{\\"ticker\\":\\"SMPL\\"}"}
+                ]""");
+
+        String text = History.groundingText(messages);
+
+        assertTrue(text.contains("buy Tesla"));
+        assertTrue(text.contains("SMPL"));
+        assertFalse(text.contains("TSLA"));
+    }
+
+    @Test
     void emptyHistoryHasNothingToDrop() {
         assertFalse(History.dropOldestExchange(JSON.createArrayNode()));
     }

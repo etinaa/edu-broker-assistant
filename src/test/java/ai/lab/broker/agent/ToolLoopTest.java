@@ -66,6 +66,11 @@ class ToolLoopTest {
         }
 
         @Override
+        public String groundingText() {
+            return "";
+        }
+
+        @Override
         public int size() {
             return 0;
         }

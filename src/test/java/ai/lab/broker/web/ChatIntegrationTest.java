@@ -188,7 +188,7 @@ class ChatIntegrationTest {
             model.callsTool("get_quote", "{\"ticker\":\"TRNC\"}");
         }
 
-        chat("BRK-1", "s1", "keep checking the price")
+        chat("BRK-1", "s1", "keep checking the price of TRNC")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.limitReached").value(true))
                 .andExpect(jsonPath("$.answer").value(containsString("step limit")));
@@ -254,6 +254,52 @@ class ChatIntegrationTest {
         chat("BRK-1", "s1", "hi")
                 .andExpect(status().isBadGateway())
                 .andExpect(content().string(not(containsString("secret"))));
+    }
+
+    @Test
+    void tickerTheModelCorrectedIsRejectedAndNoOrderIsCreated() throws Exception {
+        // The user wrote a name, the model jumped to a ticker it never saw; after find_security the same ticker is fine.
+        model.callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .callsTool("find_security", "{\"query\":\"Training Corp common\"}")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .answers("Order for 2 TRNC is ready");
+
+        chat("BRK-1", "s1", "buy 2 Training Corp common")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingOrder.orderId").value("ORD-1"));
+
+        var rejected = model.lastConversation().toolResults().getFirst();
+        assertTrue(rejected.error());
+        assertTrue(rejected.content().contains("find_security"));
+        assertTrue(broker.orderById("ORD-2").isEmpty());
+    }
+
+    @Test
+    void tickerFromThePreviousMessageOfTheSessionIsGrounded() throws Exception {
+        // Question 8: "buy 100 Sample" -> two candidates -> "Logistics" -> order SMPL from the earlier results.
+        model.callsTool("find_security", "{\"query\":\"Sample\"}")
+                .answers("Which one: SMPB or SMPL?")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"SMPL\",\"quantity\":100}")
+                .answers("Order for 100 SMPL is ready");
+
+        chat("BRK-1", "s1", "buy 100 shares of Sample").andExpect(status().isOk());
+        chat("BRK-1", "s1", "Logistics")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingOrder.ticker").value("SMPL"))
+                .andExpect(jsonPath("$.pendingOrder.total").value(1230.00));
+    }
+
+    @Test
+    void tickerOnlyTheModelItselfSaidIsNotGrounded() throws Exception {
+        model.answers("Did you mean TSLA?")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TSLA\",\"quantity\":1}")
+                .answers("I could not place it");
+
+        chat("BRK-1", "s1", "buy Tesla").andExpect(status().isOk());
+        chat("BRK-1", "s1", "yes").andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingOrder").doesNotExist());
+
+        assertTrue(model.lastConversation().toolResults().getFirst().error());
     }
 
     @Test

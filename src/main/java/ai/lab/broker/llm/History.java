@@ -11,6 +11,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
  */
 final class History {
 
+    /** Ollama has no error flag for tool results, so an error is marked in the text. */
+    static final String OLLAMA_ERROR_PREFIX = "ERROR: ";
+
     private History() {
     }
 
@@ -40,6 +43,31 @@ final class History {
         while (messages.size() > size) {
             messages.remove(messages.size() - 1);
         }
+    }
+
+    /**
+     * User messages and successful tool results, one per line: what the model may take identifiers from. The model's
+     * own text is left out (it could name a ticker it made up), and so are error results (they may echo the bad value).
+     * Claude marks errors with is_error; Ollama results start with {@link #OLLAMA_ERROR_PREFIX}.
+     */
+    static String groundingText(ArrayNode messages) {
+        StringBuilder text = new StringBuilder();
+        for (JsonNode message : messages) {
+            String role = message.path("role").asText();
+            JsonNode content = message.path("content");
+            if ("user".equals(role) && content.isTextual()) {
+                text.append(content.asText()).append('\n');
+            } else if ("user".equals(role) && content.isArray()) {
+                for (JsonNode block : content) {
+                    if ("tool_result".equals(block.path("type").asText()) && !block.path("is_error").asBoolean()) {
+                        text.append(block.path("content").asText()).append('\n');
+                    }
+                }
+            } else if ("tool".equals(role) && !content.asText().startsWith(OLLAMA_ERROR_PREFIX)) {
+                text.append(content.asText()).append('\n');
+            }
+        }
+        return text.toString();
     }
 
     private static boolean startsExchange(JsonNode message) {

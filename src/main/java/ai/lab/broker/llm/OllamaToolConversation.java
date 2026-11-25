@@ -70,8 +70,13 @@ public final class OllamaToolConversation implements ToolConversation {
             messages.add(JSON.createObjectNode()
                     .put("role", "tool")
                     .put("tool_name", result.call().name())
-                    .put("content", result.error() ? "ERROR: " + result.content() : result.content()));
+                    .put("content", result.error() ? History.OLLAMA_ERROR_PREFIX + result.content() : result.content()));
         }
+    }
+
+    @Override
+    public String groundingText() {
+        return History.groundingText(messages);
     }
 
     @Override

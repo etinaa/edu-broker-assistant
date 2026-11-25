@@ -45,6 +45,13 @@ public interface ToolConversation {
     /** Adds the results of all calls of one step: in one message or one per call, as the provider requires. */
     void addToolResults(List<ToolResult> results);
 
+    /**
+     * The user's messages and the successful tool results still in the history, as text: identifiers the model passes
+     * to tools must come from here ({@code GroundedExecutor}). The model's own replies and error results are not
+     * included.
+     */
+    String groundingText();
+
     /** Number of messages in the history; useful for the session history limit. */
     int size();
 

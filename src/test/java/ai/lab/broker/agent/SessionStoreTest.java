@@ -90,6 +90,11 @@ class SessionStoreTest {
         }
 
         @Override
+        public String groundingText() {
+            return "";
+        }
+
+        @Override
         public int size() {
             return exchanges.stream().mapToInt(Integer::intValue).sum();
         }

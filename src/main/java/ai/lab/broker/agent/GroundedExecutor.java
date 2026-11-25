@@ -8,16 +8,15 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * Сверка аргументов с тем, что модель действительно видела (перенесено из урока 1.4, задание 5).
- * Тикер в аргументах должен встречаться в сообщениях пользователя или в результатах предыдущих вызовов —
- * иначе модель его «исправила» или выдумала.
+ * Checks arguments against what the model has actually seen (from lesson 1.4, task 5). A ticker in the arguments
+ * must appear in the user's messages or in successful tool results, otherwise the model "corrected" or made it up.
  * <p>
- * Задание 7: подключить в {@link AssistantService}. Подумай, что считать «увиденным» в сессии из нескольких
- * сообщений: только текущее сообщение или всю историю сессии? Экземпляр накапливает результаты своих вызовов.
+ * Task 7: {@link AssistantService} creates one per message, seeded with {@code ToolConversation.groundingText()},
+ * i.e. the whole session history. The instance then adds the results of its own calls as they come.
  */
 public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
 
-    /** Сверяются только идентификаторы — их модель не вправе выводить. */
+    /** Only identifiers are checked: the model must not derive them. */
     private static final List<String> IDENTIFIER_ARGUMENTS = List.of("ticker");
 
     private final Function<ToolCall, ToolResult> delegate;
@@ -45,7 +44,7 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         return result;
     }
 
-    /** Целым токеном, без учёта регистра: trnc → TRNC — допустимая нормализация, TRN → TRNC — нет. */
+    /** As a whole token, ignoring case: trnc → TRNC is an allowed normalization, TRN → TRNC is not. */
     private boolean wasSeen(String value) {
         Pattern token = Pattern.compile("(?<![\\p{L}\\d-])" + Pattern.quote(value) + "(?![\\p{L}\\d-])",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);

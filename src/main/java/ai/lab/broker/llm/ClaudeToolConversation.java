@@ -69,6 +69,11 @@ public final class ClaudeToolConversation implements ToolConversation {
     }
 
     @Override
+    public String groundingText() {
+        return History.groundingText(messages);
+    }
+
+    @Override
     public int size() {
         return messages.size();
     }
