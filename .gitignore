@@ -1,3 +1,5 @@
 /.idea/
 /target/
 *.log
+# Local secrets (ANTHROPIC_API_KEY); .env.example is the template.
+.env
