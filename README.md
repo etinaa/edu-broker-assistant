@@ -35,5 +35,5 @@ mvn test
 ## Что убрано при переносе из `stage1-llm-basics`
 
 Streaming, structured outputs через `output_config`, `count_tokens`, управление моделями Ollama и печать
-сырых ответов в консоль (теперь — `logging.level.ai.lab.broker.llm: DEBUG`). Streaming вернётся в задании 10.
+сырых ответов в консоль (теперь — `logging.level.llm-payload: DEBUG`, только локально: в логах окажутся данные клиентов). Streaming вернётся в задании 10.
 `ContextGuard` не перенесён — лимит истории сессии решается в задании 4.

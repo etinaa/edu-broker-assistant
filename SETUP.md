@@ -132,7 +132,7 @@ run. What can be tuned:
 | `broker.order-ttl` | `5m` | an order not confirmed within this time becomes `EXPIRED` |
 | `broker.max-price-move-percent` | `2` | how far the price may move against the client before confirm; more is a `PRICE_CHANGED` refusal |
 
-Debugging: `logging.level.ai.lab.broker.llm: DEBUG` prints the raw requests to and responses from the models.
+Debugging: `logging.level.llm-payload: DEBUG` prints the raw requests to and responses from the models. They contain the whole conversation and the client's cash and positions, so enable it only locally.
 
 Any property can be overridden without editing the file: with an argument,
 `mvn spring-boot:run -Dspring-boot.run.arguments=--agent.max-steps=4`, or with an environment variable (also

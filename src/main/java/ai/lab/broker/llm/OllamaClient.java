@@ -3,7 +3,6 @@ package ai.lab.broker.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -17,7 +16,6 @@ import java.util.Map;
  * Local model via Ollama (POST /api/chat). Carried over from stage1-llm-basics and reduced to the request with
  * tools; the server address, model and context window come from configuration.
  */
-@Slf4j
 public class OllamaClient {
 
     private static final String NO_COST = "0";
@@ -64,9 +62,9 @@ public class OllamaClient {
         HttpResponse<String> response = http.send(buildRequest(body), HttpResponse.BodyHandlers.ofString());
         long latency = Duration.ofNanos(System.nanoTime() - start).toMillis();
         if (response.statusCode() != 200) {
-            throw new IllegalStateException("Ollama " + response.statusCode() + ": " + response.body());
+            throw new IllegalStateException("Ollama " + response.statusCode() + ": " + Payloads.errorBody(response.body()));
         }
-        log.debug("Ollama ← {}", response.body());
+        Payloads.LOG.debug("Ollama ← {}", response.body());
 
         JsonNode root = JSON.readTree(response.body());
         JsonNode message = root.path("message");
@@ -85,7 +83,7 @@ public class OllamaClient {
 
     private HttpRequest buildRequest(Map<String, Object> body) throws Exception {
         String json = JSON.writeValueAsString(body);
-        log.debug("Ollama → {}", json);
+        Payloads.LOG.debug("Ollama → {}", json);
         return HttpRequest.newBuilder(URI.create(baseUrl + "/api/chat"))
                 .timeout(Duration.ofSeconds(300))
                 .header("Content-Type", "application/json")

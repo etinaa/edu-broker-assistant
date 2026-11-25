@@ -43,5 +43,7 @@ management:
 
 logging:
   level:
-    # DEBUG shows the raw requests to and responses from the models.
     ai.lab.broker.llm: INFO
+    # DEBUG logs the raw requests to and responses from the models: the whole conversation and the client's cash and
+    # positions in plain text. Local debugging only, never in a shared environment.
+    llm-payload: INFO

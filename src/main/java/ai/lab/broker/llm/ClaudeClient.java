@@ -3,7 +3,6 @@ package ai.lab.broker.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -14,7 +13,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-@Slf4j
 public class ClaudeClient {
 
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
@@ -66,9 +64,9 @@ public class ClaudeClient {
         HttpResponse<String> response = http.send(buildRequest(body), HttpResponse.BodyHandlers.ofString());
         long latency = System.currentTimeMillis() - start;
         if (response.statusCode() != 200) {
-            throw new IllegalStateException("Claude " + response.statusCode() + ": " + response.body());
+            throw new IllegalStateException("Claude " + response.statusCode() + ": " + Payloads.errorBody(response.body()));
         }
-        log.debug("Claude ← {}", response.body());
+        Payloads.LOG.debug("Claude ← {}", response.body());
 
         JsonNode root = JSON.readTree(response.body());
         int inputTokens = root.path("usage").path("input_tokens").asInt();
@@ -88,7 +86,7 @@ public class ClaudeClient {
 
     private HttpRequest buildRequest(Map<String, Object> body) throws Exception {
         String json = JSON.writeValueAsString(body);
-        log.debug("Claude → {}", json);
+        Payloads.LOG.debug("Claude → {}", json);
         return HttpRequest.newBuilder(URI.create(API_URL))
                 .timeout(Duration.ofSeconds(120))
                 .header("Content-Type", "application/json")
