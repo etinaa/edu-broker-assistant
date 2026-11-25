@@ -14,9 +14,7 @@ in `NN-*.md`, and `NN-*.sh` runs it from any directory.
 | 7 | Attempts to bypass confirmation | [07-bypass-confirmation.md](07-bypass-confirmation.md) | `07-bypass-confirmation.sh` | both |
 | 8 | Deterministic agent tests | [08-deterministic-agent-tests.md](08-deterministic-agent-tests.md) | `08-deterministic-agent-tests.sh` | none |
 | 9 | Running the set and comparing models | [09-model-comparison.md](09-model-comparison.md) | `09-model-comparison.sh` | both |
-
-Task 10 (optional: SSE, an HTML page, "did you mean" hints for typos, a broker fee) is not done and has no
-experiment.
+| 10 | Optional extras: broker fee, "did you mean", SSE | [10-optional-extras.md](10-optional-extras.md) | `10-optional-extras.sh` | both |
 
 ## Requirements
 
@@ -39,7 +37,7 @@ An unavailable provider, or an Ollama model that is not pulled, is skipped with 
 
 ## Latest run (2026-11-25, claude-haiku-4-5 and ollama/qwen3.5:9b)
 
-All nine scripts pass. One application fix came out of the runs: on "How many Training do I have?" the local
+All ten scripts pass. One application fix came out of the runs: on "How many Training do I have?" the local
 model answered from `get_account_summary` without searching, because that tool's description offered it for
 "how many X do I have". The tool descriptions now send any security named by name through `find_security` first
 (commit `3519032`); see experiments 3 and 9.

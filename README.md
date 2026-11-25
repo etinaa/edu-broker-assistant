@@ -82,15 +82,15 @@ Each task is checked by the experiment with the same number in [experiments/](ex
 | 7 | Attempts to bypass confirmation | The model has no way to confirm: "buy and confirm right away" and an instruction injected into a catalog name give at most a pending order. `GroundedExecutor` refuses a ticker the session has not seen, including one the model "corrected". |
 | 8 | Deterministic agent tests | A scripted model (`ScriptedConversationFactory`) returns predefined tool calls. Tests through `MockMvc` and `@SpringBootTest`: ambiguous search → `candidates`, insufficient cash → refusal and no order, a looping model → step limit and an honest answer, a failing tool → the loop survives. |
 | 9 | Running the set and comparing models | 14 test questions on Claude and Ollama: is the outcome right, steps, tokens, cost, latency. Question 12 ("buy TRNC with all my money") checks who computes the quantity — the model or the code. |
-| 10 | Optional extras | Streaming over SSE, an HTML page with Confirm / Reject buttons, "did you mean" hints for typos, a broker fee in the total. **Not done.** |
+| 10 | Optional extras | A broker fee (`broker.fee-percent`, `broker.min-fee`) in `pendingOrder`, the refusals and the executed order, computed in one place (`TradeCost`) and recomputed on confirm. "Did you mean" hints for a search with a typo (`TypoSuggestions`, Levenshtein); no order on a suggestion until the user answers. `POST /chat/stream`: the progress of a message as server-sent events, ending with the same response as `/chat`. |
 
 The 14 questions with their expected outcomes are listed in
 [experiment 9](experiments/09-model-comparison.md#questions-and-automatic-checks).
 
 ## Results
 
-Tasks 1–9 are done; task 10 (optional extras) is not.
-304 tests pass without a network: a scripted model replaces the provider. The live numbers below come from the
+All ten tasks are done.
+360 tests pass without a network: a scripted model replaces the provider. The live numbers below come from the
 [experiments](experiments/README.md) of 2026-11-25 on `claude-haiku-4-5` and `ollama/qwen3.5:9b`.
 
 | | Claude | Ollama |
@@ -115,6 +115,11 @@ What the experiments showed:
   54 shares, got the code's refusal for insufficient funds, and then ordered 53. This is the argument for a
   `max_affordable_quantity` tool or an order "for an amount": the code already checks the total and could
   compute the quantity itself.
+- **A fee makes the model's arithmetic wrong, and the code still catches it.** With a 2% fee "all my money" is 52
+  TRNC, not 53. Claude ordered 53 and then 52; the local model went 54 → 53 → 52. Every total with the fee came
+  from the code, while the local model sometimes left the fee out of its text.
+- **A typo gives a question, not a guess.** "Buy 10 DEMA" gives "Did you mean DEMO?" and no order on both models;
+  the user's "Yes" then creates it.
 - **A local model is a usable fallback, not a replacement.** It reached the same outcomes, for free, but about ten
   times slower and with more steps, and it needed stricter tool descriptions to get there.
 
