@@ -31,8 +31,8 @@ class ChatController {
     }
 
     /**
-     * Счёт берётся из заголовка и передаётся сервису; модель о нём не знает. Несуществующий счёт — 404
-     * до обращения к модели.
+     * The account comes from the header and is passed to the service; the model knows nothing about it. An unknown
+     * account is 404 before the model is called.
      */
     @PostMapping("/chat")
     ChatResponse chat(@RequestHeader(ACCOUNT_HEADER) String accountId, @Valid @RequestBody ChatRequest request) {
@@ -40,7 +40,7 @@ class ChatController {
         return assistant.chat(accountId, request.sessionId(), request.message());
     }
 
-    /** Начать диалог заново: история сессии удаляется. */
+    /** Start the conversation over: the session history is deleted. */
     @DeleteMapping("/chat/{sessionId}")
     ResponseEntity<Void> resetSession(@RequestHeader(ACCOUNT_HEADER) String accountId,
                                       @PathVariable String sessionId) {

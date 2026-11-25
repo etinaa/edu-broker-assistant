@@ -29,13 +29,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Инструменты ассистента: определения (в формате Claude: name, description, input_schema) и их выполнение
- * через {@link BrokerService}. Описание инструмента — это промпт: модель выбирает инструмент и заполняет
- * аргументы только по нему. Подтверждения сделки среди инструментов нет и не будет.
+ * The assistant's tools: definitions (in Claude's format: name, description, input_schema) and their execution
+ * through {@link BrokerService}. A tool description is a prompt: the model picks the tool and fills in the
+ * arguments from it alone. Confirming a trade is not a tool and never will be.
  * <p>
- * Счёт модель не знает и не выбирает: {@code accountId} приходит из запроса (заголовок X-Account-Id) и передаётся
- * в {@link #execute} кодом. В схемах инструментов параметра счёта нет, а результаты инструментов не должны его
- * содержать: сериализуй не {@code Account}/{@code Order} целиком (там есть id и accountId), а представления без номера счёта.
+ * The model neither knows nor chooses the account: {@code accountId} comes from the request (the X-Account-Id
+ * header) and code passes it to {@link #execute}. The tool schemas have no account parameter, and tool results must
+ * not contain it either: serialize views without the account number, not whole {@code Account}/{@code Order}
+ * objects (they hold id and accountId).
  */
 @Component
 public class BrokerTools {
@@ -77,8 +78,8 @@ public class BrokerTools {
             """;
 
     /**
-     * quantity в схеме — number, а не integer: пусть нецелое количество доходит до кода и отклоняется там
-     * (вопрос 10). Сравни, что меняется, если поставить integer.
+     * quantity is number in the schema, not integer: a non-integer quantity should reach the code and be refused
+     * there (question 10). Compare what changes with integer.
      */
     static final String PLACE_ORDER = """
             {
@@ -117,12 +118,12 @@ public class BrokerTools {
         }
     }
 
-    /** Определения для запроса к модели. Копия — чтобы диалог не мог случайно изменить общий экземпляр. */
+    /** Definitions for the model request. A copy, so a conversation cannot change the shared instance by accident. */
     public ArrayNode definitions() {
         return definitions.deepCopy();
     }
 
-    /** Выполнение вызова от имени счёта accountId. Неизвестный инструмент — ошибка для модели, а не исключение. */
+    /** Runs a call on behalf of account accountId. An unknown tool is an error for the model, not an exception. */
     public ToolResult execute(String accountId, ToolCall call) {
         return switch (call.name()) {
             case "get_account_summary" -> getAccountSummary(accountId, call);
@@ -133,7 +134,7 @@ public class BrokerTools {
         };
     }
 
-    /** Деньги и позиции счёта без номера счёта; название бумаги — из справочника. Нулевые позиции не показываем. */
+    /** Cash and positions without the account number; security names come from the catalog. Zero positions are left out. */
     private ToolResult getAccountSummary(String accountId, ToolCall call) {
         Optional<Account> optAccount = broker.accountSnapshot(accountId);
         if (optAccount.isEmpty()) {
@@ -163,8 +164,8 @@ public class BrokerTools {
     }
 
     /**
-     * broker.findSecurity(query) → JSON с match и списком бумаг (тикер, ISIN, название). Пустой запрос — это
-     * NOT_FOUND от сервиса, а не is_error; is_error только если поля query нет или оно не строка.
+     * broker.findSecurity(query) → JSON with match and the list of securities (ticker, ISIN, name). An empty query
+     * is NOT_FOUND from the service, not is_error; is_error only if query is missing or not a string.
      */
     private ToolResult findSecurity(ToolCall call) {
         JsonNode args = argumentsOf(call);
@@ -184,12 +185,12 @@ public class BrokerTools {
         return ToolResult.ok(call, toJson(view));
     }
 
-    /** Аргументы вызова; если модель их не прислала — «пустой» узел, чтобы path() не падал на null. */
+    /** The call arguments; a missing node if the model sent none, so path() does not fail on null. */
     private static JsonNode argumentsOf(ToolCall call) {
         return call.arguments() == null ? MissingNode.getInstance() : call.arguments();
     }
 
-    /** Тикер из аргументов без пробелов по краям; пустая строка, если его нет. */
+    /** The ticker from the arguments without surrounding spaces; an empty string if there is none. */
     private static String tickerOf(JsonNode args) {
         return args.path("ticker").asText("").strip();
     }
@@ -202,7 +203,7 @@ public class BrokerTools {
         return view;
     }
 
-    /** Цена бумаги по точному тикеру (в ответе канонический тикер из справочника); неизвестный тикер — is_error. */
+    /** The price by exact ticker (the result has the canonical ticker from the catalog); an unknown ticker is is_error. */
     private ToolResult getQuote(ToolCall call) {
         String ticker = tickerOf(argumentsOf(call));
         if (ticker.isEmpty()) {
@@ -222,10 +223,10 @@ public class BrokerTools {
     }
 
     /**
-     * Разбирает аргументы (side из enum, ticker — непустая строка, quantity — целое положительное), вызывает
-     * broker.placeOrder(accountId, …) и возвращает Created или Refused как обычный результат: отказ (в том числе
-     * нецелое количество 2.5) — нормальный исход, который модель пересказывает. is_error — только для аргументов,
-     * которые не соответствуют схеме (нет поля, неизвестный side): так модель понимает, что вызов надо исправить.
+     * Parses the arguments (side from the enum, ticker a non-empty string, quantity a positive integer), calls
+     * broker.placeOrder(accountId, ...) and returns Created or Refused as an ordinary result: a refusal (including a
+     * non-integer quantity of 2.5) is a normal outcome the model relays. is_error is only for arguments that break
+     * the schema (a missing field, an unknown side): that tells the model the call itself must be fixed.
      */
     private ToolResult placeOrder(String accountId, ToolCall call) {
         JsonNode args = argumentsOf(call);
@@ -246,7 +247,7 @@ public class BrokerTools {
         return toToolResult(call, decide(accountId, side, ticker, quantityNode));
     }
 
-    /** Нецелое количество — отказ того же вида, что и остальные, чтобы модель пересказала его как обычный исход. */
+    /** A non-integer quantity is a refusal like the others, so the model relays it as an ordinary outcome. */
     private OrderDecision decide(String accountId, OrderSide side, String ticker, JsonNode quantityNode) {
         Long quantity = parseWholeQuantity(quantityNode);
         if (quantity == null) {
@@ -274,7 +275,7 @@ public class BrokerTools {
         }
     }
 
-    /** Целое количество из числа или строки ("5", 5, 5.0); 2.5, "abc", слишком большое число — null. */
+    /** An integer quantity from a number or a string ("5", 5, 5.0); 2.5, "abc" or a number too large give null. */
     private static Long parseWholeQuantity(JsonNode node) {
         BigDecimal value;
         if (node.isNumber()) {
@@ -295,7 +296,7 @@ public class BrokerTools {
         }
     }
 
-    /** Представление созданной заявки для модели: id заявки есть, номера счёта нет. */
+    /** The created order as the model sees it: the order id is there, the account number is not. */
     private static Map<String, Object> createdView(OrderDecision.Created created) {
         Order order = created.order();
         Map<String, Object> view = new LinkedHashMap<>();
@@ -311,7 +312,7 @@ public class BrokerTools {
         return view;
     }
 
-    /** Отказ с числами из кода (needed/available/shortfall — null для отказов без цифр). */
+    /** A refusal with numbers from code (needed/available/shortfall are null for refusals without numbers). */
     private static Map<String, Object> refusedView(OrderDecision.Refused refused) {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("result", "REFUSED");
@@ -323,7 +324,7 @@ public class BrokerTools {
         return view;
     }
 
-    /** Сериализация результатов инструментов: BigDecimal как числа, даты — ISO-строкой. */
+    /** Serializes tool results: BigDecimal as numbers, dates as ISO strings. */
     static String toJson(Object value) {
         try {
             return JSON.writeValueAsString(value);

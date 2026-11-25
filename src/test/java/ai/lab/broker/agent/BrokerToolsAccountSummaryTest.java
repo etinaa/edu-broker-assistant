@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** get_account_summary без модели: данные своего счёта, без номера счёта в ответе. */
+/** get_account_summary without a model: the caller's own account data, with no account number in the result. */
 class BrokerToolsAccountSummaryTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

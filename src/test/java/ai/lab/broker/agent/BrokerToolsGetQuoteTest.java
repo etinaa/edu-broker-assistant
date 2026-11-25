@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** get_quote без модели: цена по тикеру или ошибка для модели. */
+/** get_quote without a model: the price by ticker, or an error for the model. */
 class BrokerToolsGetQuoteTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

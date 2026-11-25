@@ -1,9 +1,9 @@
 package ai.lab.broker.agent;
 
 /**
- * Системный промпт ассистента. Правила здесь — для удобства пользователя; соблюдает их код
- * ({@link ai.lab.broker.broker.BrokerService}, подтверждение через /orders/{id}/confirm). Меняй и сравнивай
- * на прогонах (задания 3 и 9).
+ * The assistant's system prompt. Its rules are for the user's convenience; code is what enforces them
+ * ({@link ai.lab.broker.broker.BrokerService}, confirmation through /orders/{id}/confirm). Change it and compare
+ * on the runs (tasks 3 and 9).
  */
 final class SystemPrompt {
 

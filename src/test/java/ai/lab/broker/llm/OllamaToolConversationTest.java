@@ -107,13 +107,13 @@ class OllamaToolConversationTest {
     void addUserMessageAppendsUserRoleMessage() throws Exception {
         OllamaToolConversation conv = conversation();
 
-        conv.addUserMessage("привет");
+        conv.addUserMessage("hello");
 
         assertEquals(1, conv.size());
         conv.send();
         JsonNode first = calls.getFirst().messages().get(0);
         assertEquals("user", first.path("role").asText());
-        assertEquals("привет", first.path("content").asText());
+        assertEquals("hello", first.path("content").asText());
     }
 
     // ---- send ----
@@ -135,7 +135,7 @@ class OllamaToolConversationTest {
 
     @Test
     void sendWithTextAnswerReturnsNoCallsAndStoresAssistantMessage() throws Exception {
-        nextMessage = assistantText("Здравствуйте");
+        nextMessage = assistantText("Hi there");
         OllamaToolConversation conv = conversation();
         conv.addUserMessage("hi");
 
@@ -152,7 +152,7 @@ class OllamaToolConversationTest {
                 function("find_security", "query", "TRNC"),
                 function("get_price", "ticker", "SMPL"));
         OllamaToolConversation conv = conversation();
-        conv.addUserMessage("найди");
+        conv.addUserMessage("find");
 
         Turn turn = conv.send();
 
@@ -187,7 +187,7 @@ class OllamaToolConversationTest {
     void sendKeepsAssistantMessageWithToolCallsInHistory() throws Exception {
         nextMessage = assistantWithCalls(function("find_security", "query", "TRNC"));
         OllamaToolConversation conv = conversation();
-        conv.addUserMessage("найди");
+        conv.addUserMessage("find");
         conv.send();
 
         nextMessage = assistantText("done");
@@ -262,11 +262,11 @@ class OllamaToolConversationTest {
     void fullToolCycleSendsUserAssistantToolHistoryOnSecondRequest() throws Exception {
         nextMessage = assistantWithCalls(function("find_security", "query", "TRNC"));
         OllamaToolConversation conv = conversation();
-        conv.addUserMessage("найди TRNC");
+        conv.addUserMessage("find TRNC");
         Turn first = conv.send();
 
         conv.addToolResults(List.of(ToolResult.ok(first.calls().getFirst(), "TRNC found")));
-        nextMessage = assistantText("Нашёл TRNC");
+        nextMessage = assistantText("Found TRNC");
         Turn second = conv.send();
 
         assertTrue(second.calls().isEmpty());

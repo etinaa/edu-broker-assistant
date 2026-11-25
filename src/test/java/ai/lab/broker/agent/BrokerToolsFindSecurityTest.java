@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** find_security без модели: match и список бумаг в JSON, без номера счёта. */
+/** find_security without a model: match and the list of securities in JSON, with no account number. */
 class BrokerToolsFindSecurityTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.NoSuchElementException;
 
-/** Ошибки — в формате ProblemDetail (RFC 9457), без стектрейсов наружу. */
+/** Errors as ProblemDetail (RFC 9457), with no stack traces sent to the client. */
 @RestControllerAdvice
 class ApiExceptionHandler {
 
-    /** Заглушки скелета: «Задание N: …» — видно, что осталось сделать. */
+    /** Skeleton stubs ("Task N: ..."): shows what is left to implement. */
     @ExceptionHandler(UnsupportedOperationException.class)
     ProblemDetail notImplemented(UnsupportedOperationException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, e.getMessage());

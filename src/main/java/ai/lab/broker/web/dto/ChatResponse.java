@@ -10,9 +10,9 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Ответ /chat. answer — текст модели для человека; pendingOrder и candidates собирает код из результатов
- * инструментов. Если текст модели разошёлся с цифрами здесь — права структура.
- * pendingOrder — null, если заявка в этом сообщении не создавалась; candidates — пустой, если выбирать не из чего.
+ * The /chat response. answer is the model's text for the user; code builds pendingOrder and candidates from the
+ * tool results. If the model's text disagrees with the numbers here, the structure is right.
+ * pendingOrder is null if this message created no order; candidates is empty if there is nothing to choose from.
  */
 public record ChatResponse(String answer, PendingOrder pendingOrder, List<Security> candidates,
                            boolean limitReached, String traceId) {

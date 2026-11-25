@@ -35,7 +35,7 @@ class OllamaClientIntegrationTest {
     private volatile String responseBody = TEXT_ANSWER;
 
     private static final String TEXT_ANSWER = """
-            {"model":"qwen2.5:14b","message":{"role":"assistant","content":"Привет!"},
+            {"model":"qwen2.5:14b","message":{"role":"assistant","content":"Hello!"},
              "done":true,"done_reason":"stop","prompt_eval_count":42,"eval_count":7}""";
 
     private static final String TOOL_CALL_ANSWER = """
@@ -113,14 +113,14 @@ class OllamaClientIntegrationTest {
     @Test
     void systemPromptIsFirstMessageFollowedByHistoryInOrder() throws Exception {
         new OllamaClient(baseUrl, "m", null)
-                .chatWithTools("Ты брокер", messages("первый", "второй"), tools(), 0.0);
+                .chatWithTools("You are a broker", messages("first", "second"), tools(), 0.0);
 
         JsonNode msgs = sentBody().path("messages");
         assertEquals(3, msgs.size());
         assertEquals("system", msgs.get(0).path("role").asText());
-        assertEquals("Ты брокер", msgs.get(0).path("content").asText());
-        assertEquals("первый", msgs.get(1).path("content").asText());
-        assertEquals("второй", msgs.get(2).path("content").asText());
+        assertEquals("You are a broker", msgs.get(0).path("content").asText());
+        assertEquals("first", msgs.get(1).path("content").asText());
+        assertEquals("second", msgs.get(2).path("content").asText());
     }
 
     @Test
@@ -149,7 +149,7 @@ class OllamaClientIntegrationTest {
                 .chatWithTools("s", messages("hi"), tools(), 0.0);
 
         LlmResponse r = turn.response();
-        assertEquals("Привет!", r.text());
+        assertEquals("Hello!", r.text());
         assertEquals(42, r.inputTokens());
         assertEquals(7, r.outputTokens());
         assertEquals("stop", r.stopReason());
@@ -164,7 +164,7 @@ class OllamaClientIntegrationTest {
         responseBody = TOOL_CALL_ANSWER;
 
         OllamaClient.ToolTurn turn = new OllamaClient(baseUrl, "m", null)
-                .chatWithTools("s", messages("найди TRNC"), tools(), 0.0);
+                .chatWithTools("s", messages("find TRNC"), tools(), 0.0);
 
         JsonNode call = turn.message().path("tool_calls").get(0).path("function");
         assertEquals("find_security", call.path("name").asText());
@@ -244,7 +244,7 @@ class OllamaClientIntegrationTest {
         OllamaToolConversation conv =
                 new OllamaToolConversation(new OllamaClient(baseUrl, "m", null), "sys", claudeTools, 0.0);
 
-        conv.addUserMessage("найди TRNC");
+        conv.addUserMessage("find TRNC");
         ToolConversation.Turn turn = conv.send();
 
         assertEquals(1, turn.calls().size());

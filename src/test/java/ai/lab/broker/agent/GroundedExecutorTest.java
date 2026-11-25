@@ -125,7 +125,7 @@ class GroundedExecutorTest {
 
     @Test
     void tickerSurroundedByPunctuationInTheUsersTextIsSeen() throws Exception {
-        assertFalse(executor("купи 2 акции (trnc), пожалуйста.", "{}")
+        assertFalse(executor("buy 2 shares (trnc), please.", "{}")
                 .apply(call("place_order", "{\"ticker\":\"TRNC\"}")).error());
     }
 

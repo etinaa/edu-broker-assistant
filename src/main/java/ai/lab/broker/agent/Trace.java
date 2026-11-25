@@ -7,14 +7,14 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Трасса обработки одного сообщения: шаги агента, вызовы инструментов, токены и стоимость.
- * Отдаётся через GET /traces/{id}; на этапе 4 её заменит OpenTelemetry.
- * accountId — владелец трассы: в ней баланс и позиции счёта, поэтому отдаётся она только этому счёту.
+ * The trace of one message: the agent's steps, tool calls, tokens and cost.
+ * Served by GET /traces/{id}; OpenTelemetry replaces it in stage 4.
+ * accountId is the trace's owner: it holds the account's balance and positions, so only that account gets it.
  */
 public record Trace(String id, String accountId, String sessionId, String message, String model, List<Step> steps,
                     String answer, boolean limitReached, Instant createdAt) {
 
-    /** Один запрос к модели и вызовы, которые он породил (пусто — финальный ответ). */
+    /** One request to the model and the calls it produced (empty for the final answer). */
     public record Step(List<Call> calls, int inputTokens, int outputTokens, long latencyMs,
                        String stopReason, String cost) {
 

@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * Цикл «пока модель просит вызов — выполняем» (перенесено из урока 1.4). Шаг — один запрос к модели;
- * потолок шагов обязателен, иначе модель может вызывать инструменты бесконечно.
+ * The "while the model asks for a call, run it" loop (from lesson 1.4). A step is one request to the model;
+ * the step limit is required, otherwise the model could call tools forever.
  */
 @Slf4j
 public final class ToolLoop {
@@ -22,10 +22,10 @@ public final class ToolLoop {
     /** What the model sees instead of the exception text, which may hold internal details. */
     static final String TOOL_FAILED = "Internal error in tool %s. Tell the user the operation failed; do not retry it.";
 
-    /** Один шаг цикла: что вернули инструменты (пусто — финальный ответ) и сколько стоил запрос к модели. */
+    /** One step of the loop: what the tools returned (empty for the final answer) and what the model request cost. */
     public record Step(List<ToolResult> results, LlmResponse response) {}
 
-    /** answer — текст последнего ответа; limitReached — модель всё ещё просила вызовы, когда шаги кончились. */
+    /** answer is the text of the last reply; limitReached means the model still asked for calls when the steps ran out. */
     public record Result(List<Step> steps, String answer, boolean limitReached) {}
 
     private ToolLoop() {
@@ -47,7 +47,7 @@ public final class ToolLoop {
                 steps.add(new Step(List.of(), turn.response()));
                 return new Result(steps, turn.response().text(), false);
             }
-            // Все вызовы одного ответа выполняем и возвращаем вместе — следующий запрос увидит их разом.
+            // All calls of one reply are run and returned together, so the next request sees them at once.
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall call : turn.calls()) {
                 results.add(execute(executor, call));

@@ -145,7 +145,7 @@ class ChatIntegrationTest {
 
     @Test
     void modelCannotSwitchAccountAndNeverSeesAccountId() throws Exception {
-        // «покажи BRK-2»: the schema has no account parameter, an extra argument is ignored.
+        // "show BRK-2": the schema has no account parameter, an extra argument is ignored.
         model.callsTool("get_account_summary", "{\"accountId\":\"BRK-2\"}")
                 .answers("You have 10000.00 USD");
 

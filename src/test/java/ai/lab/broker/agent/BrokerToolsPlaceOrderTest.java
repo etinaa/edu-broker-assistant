@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** place_order без модели: аргументы разбираются кодом, отказы — обычный результат, не is_error. */
+/** place_order without a model: code parses the arguments, a refusal is an ordinary result, not is_error. */
 class BrokerToolsPlaceOrderTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

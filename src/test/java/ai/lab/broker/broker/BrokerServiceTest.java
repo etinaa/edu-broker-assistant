@@ -803,7 +803,7 @@ class BrokerServiceTest {
         assertEquals(Match.EXACT, byTicker.match());
         assertSame(alpha, byTicker.securities().getFirst());
 
-        // а по общей части названия, которая не тикер, остаются оба кандидата
+        // while a shared part of the names that is not a ticker still gives both candidates
         assertEquals(Match.CANDIDATES, custom.findSecurity("Inc").match());
     }
 }
