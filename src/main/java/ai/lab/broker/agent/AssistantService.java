@@ -38,6 +38,10 @@ public class AssistantService {
     static final String LIMIT_REACHED_ANSWER =
             "I could not finish this request within the step limit. Please rephrase it or split it into smaller steps.";
 
+    /** Appended to an answer that hit the output length limit, so the user does not take it as complete. */
+    static final String TRUNCATED_NOTE =
+            "\n\n(The answer was cut off by the length limit. Ask me to continue or narrow the question.)";
+
     /** Exact BigDecimal for floats, so cashAfter keeps its scale (9629.50, not 9629.5). */
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -152,7 +156,9 @@ public class AssistantService {
         List<ToolResult> results = result.steps().stream()
                 .flatMap(step -> step.results().stream())
                 .toList();
-        String answer = result.limitReached() ? LIMIT_REACHED_ANSWER : result.answer();
+        String answer = result.limitReached() ? LIMIT_REACHED_ANSWER
+                : result.truncated() ? result.answer() + TRUNCATED_NOTE
+                : result.answer();
         PendingOrder pendingOrder = pendingOrder(results);
         List<Security> candidates = candidates(results);
 

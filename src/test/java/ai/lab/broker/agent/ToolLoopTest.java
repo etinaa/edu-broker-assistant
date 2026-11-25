@@ -2,6 +2,7 @@ package ai.lab.broker.agent;
 
 import ai.lab.broker.llm.LlmResponse;
 import ai.lab.broker.llm.ToolConversation;
+import ai.lab.broker.llm.ToolConversation.Turn;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
@@ -40,12 +41,48 @@ class ToolLoopTest {
                 () -> ToolLoop.run(new TwoStepConversation(), call -> null, 0));
     }
 
-    /** Asks for one tool call, then answers "done"; keeps the tool results the model was given. */
+    @Test
+    void callsOfACutOffReplyAreNotRunAndTheModelIsAskedToRepeatThem() throws Exception {
+        TwoStepConversation conversation = new TwoStepConversation(
+                new Turn(List.of(CALL), TwoStepConversation.response(""), true),
+                new Turn(List.of(), TwoStepConversation.response("done")));
+        List<ToolConversation.ToolCall> executed = new ArrayList<>();
+
+        ToolLoop.Result result = ToolLoop.run(conversation, call -> {
+            executed.add(call);
+            return ToolConversation.ToolResult.ok(call, "{}");
+        }, 3);
+
+        assertTrue(executed.isEmpty());
+        assertEquals(List.of(ToolConversation.ToolResult.error(CALL, ToolLoop.CALL_TRUNCATED)), conversation.sent);
+        assertEquals("done", result.answer());
+        assertFalse(result.truncated());
+    }
+
+    @Test
+    void cutOffFinalAnswerIsMarkedTruncated() throws Exception {
+        TwoStepConversation conversation = new TwoStepConversation(
+                new Turn(List.of(), TwoStepConversation.response("The portfolio holds"), true));
+
+        ToolLoop.Result result = ToolLoop.run(conversation, call -> null, 3);
+
+        assertTrue(result.truncated());
+        assertFalse(result.limitReached());
+        assertEquals("The portfolio holds", result.answer());
+    }
+
+    /** Plays the scripted turns; by default asks for one tool call, then answers "done". Keeps the tool results sent. */
     private static final class TwoStepConversation implements ToolConversation {
-        private final Deque<Turn> script = new ArrayDeque<>(List.of(
-                new Turn(List.of(CALL), response("")),
-                new Turn(List.of(), response("done"))));
+        private final Deque<Turn> script;
         private final List<ToolResult> sent = new ArrayList<>();
+
+        TwoStepConversation() {
+            this(new Turn(List.of(CALL), response("")), new Turn(List.of(), response("done")));
+        }
+
+        TwoStepConversation(Turn... turns) {
+            script = new ArrayDeque<>(List.of(turns));
+        }
 
         private static LlmResponse response(String text) {
             return new LlmResponse(text, 1, 1, 1, "end_turn", "0");

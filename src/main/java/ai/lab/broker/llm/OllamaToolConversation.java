@@ -57,7 +57,7 @@ public final class OllamaToolConversation implements ToolConversation {
             String id = call.hasNonNull("id") ? call.path("id").asText() : null;
             calls.add(new ToolCall(id, function.path("name").asText(), function.path("arguments")));
         }
-        return new Turn(calls, turn.response());
+        return new Turn(calls, turn.response(), "length".equals(turn.response().stopReason()));
     }
 
     /**

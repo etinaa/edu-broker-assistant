@@ -36,8 +36,16 @@ public interface ToolConversation {
     /** What the model was given and may rely on: user messages as typed, tool results as returned (JSON). */
     record Seen(List<String> userMessages, List<String> toolResults) {}
 
-    /** The model's reply on one step: empty calls means the model answered with text and the loop is done. */
-    record Turn(List<ToolCall> calls, LlmResponse response) {}
+    /**
+     * The model's reply on one step: empty calls means the model answered with text and the loop is done.
+     * truncated — the reply hit the output token limit (Claude max_tokens, Ollama length): the text is incomplete,
+     * and the last call's arguments may be too.
+     */
+    record Turn(List<ToolCall> calls, LlmResponse response, boolean truncated) {
+        public Turn(List<ToolCall> calls, LlmResponse response) {
+            this(calls, response, false);
+        }
+    }
 
     /** Adds a new user message to the session history. */
     void addUserMessage(String text);

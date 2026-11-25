@@ -22,11 +22,18 @@ public final class ToolLoop {
     /** What the model sees instead of the exception text, which may hold internal details. */
     static final String TOOL_FAILED = "Internal error in tool %s. Tell the user the operation failed; do not retry it.";
 
+    /** What the model gets for each call of a reply cut off by the output limit: the call is not run. */
+    static final String CALL_TRUNCATED = "Your reply hit the output length limit, so this call may be incomplete and "
+            + "was not run. Call the tool again in a shorter reply.";
+
     /** One step of the loop: what the tools returned (empty for the final answer) and what the model request cost. */
     public record Step(List<ToolResult> results, LlmResponse response) {}
 
-    /** answer is the text of the last reply; limitReached means the model still asked for calls when the steps ran out. */
-    public record Result(List<Step> steps, String answer, boolean limitReached) {}
+    /**
+     * answer is the text of the last reply; limitReached means the model still asked for calls when the steps ran out;
+     * truncated means the final answer hit the output length limit and is incomplete.
+     */
+    public record Result(List<Step> steps, String answer, boolean limitReached, boolean truncated) {}
 
     private ToolLoop() {
     }
@@ -45,17 +52,19 @@ public final class ToolLoop {
             Turn turn = send(conversation);
             if (turn.calls().isEmpty()) {
                 steps.add(new Step(List.of(), turn.response()));
-                return new Result(steps, turn.response().text(), false);
+                return new Result(steps, turn.response().text(), false, turn.truncated());
             }
             // All calls of one reply are run and returned together, so the next request sees them at once.
+            // A cut-off reply runs none: its last call may have partial arguments (a quantity of 1 instead of 100),
+            // and each call still needs a result, otherwise the provider rejects the history.
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall call : turn.calls()) {
-                results.add(execute(executor, call));
+                results.add(turn.truncated() ? ToolResult.error(call, CALL_TRUNCATED) : execute(executor, call));
             }
             conversation.addToolResults(results);
             steps.add(new Step(results, turn.response()));
         }
-        return new Result(steps, steps.getLast().response().text(), true);
+        return new Result(steps, steps.getLast().response().text(), true, false);
     }
 
     /** Everything send() throws is the provider's failure, so it is marked apart from failures of our own code. */

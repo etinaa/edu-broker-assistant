@@ -49,7 +49,7 @@ public final class ClaudeToolConversation implements ToolConversation {
                 calls.add(new ToolCall(block.path("id").asText(), block.path("name").asText(), block.path("input")));
             }
         }
-        return new Turn(calls, turn.response());
+        return new Turn(calls, turn.response(), "max_tokens".equals(turn.response().stopReason()));
     }
 
     /** All results of a step go in one user message; tool_use_id links each result to its call. */

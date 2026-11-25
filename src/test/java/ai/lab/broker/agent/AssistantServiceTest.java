@@ -92,6 +92,22 @@ class AssistantServiceTest {
     }
 
     @Test
+    void cutOffOrderCallCreatesNoOrderAndCutOffAnswerIsMarked() throws Exception {
+        script.add(new ToolConversation.Turn(
+                List.of(new ToolConversation.ToolCall("c0", "place_order",
+                        MAPPER.readTree("{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":1}"))),
+                response(""), true));
+        script.add(new ToolConversation.Turn(List.of(), response("Your order for"), true));
+
+        ChatResponse response = service.chat("BRK-1", "s1", "buy 100 TRNC");
+
+        assertNull(response.pendingOrder());
+        assertTrue(broker.orderById("ORD-1").isEmpty());
+        assertEquals("Your order for" + AssistantService.TRUNCATED_NOTE, response.answer());
+        assertFalse(response.limitReached());
+    }
+
+    @Test
     void createdOrderBecomesPendingOrder() throws Exception {
         callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
         answers("Order created, confirm it in the UI");
