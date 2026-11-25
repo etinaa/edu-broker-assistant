@@ -527,8 +527,8 @@ class BrokerServiceTest {
     void confirmRefusedForUnknownOrder() {
         OrderDecision d = service.confirmOrder("BRK-1", "ORD-999");
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
-        assertEquals("Order with orderId = ORD-999 not found", refusedMessage(d));
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(d));
+        assertEquals("Order ORD-999 not found", refusedMessage(d));
     }
 
     @Test
@@ -537,8 +537,8 @@ class BrokerServiceTest {
 
         OrderDecision d = service.confirmOrder("nope", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
-        assertEquals("Account with accountId = nope not found", refusedMessage(d));
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(d));
+        assertEquals("Order " + order.getId() + " not found", refusedMessage(d));
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
     }
 
@@ -548,8 +548,9 @@ class BrokerServiceTest {
 
         OrderDecision d = service.confirmOrder("BRK-2", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(d));
-        assertEquals("OrderId = " + order.getId() + " not related to accountId = BRK-2", refusedMessage(d));
+        // The same refusal as for a missing order: another account's order ids cannot be probed.
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(d));
+        assertEquals("Order " + order.getId() + " not found", refusedMessage(d));
 
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
@@ -615,13 +616,11 @@ class BrokerServiceTest {
         OrderDecision unknownAccount = service.rejectOrder("nope", order.getId());
         OrderDecision foreignAccount = service.rejectOrder("BRK-2", order.getId());
 
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(unknownOrder));
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(unknownAccount));
-        assertEquals(Reason.ILLEGAL_ACCESS, refusedReason(foreignAccount));
-        assertEquals("Order with orderId = ORD-999 not found", refusedMessage(unknownOrder));
-        assertEquals("Account with accountId = nope not found", refusedMessage(unknownAccount));
-        assertEquals("OrderId = " + order.getId() + " not related to accountId = BRK-2",
-                refusedMessage(foreignAccount));
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(unknownOrder));
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(unknownAccount));
+        assertEquals(Reason.ORDER_NOT_FOUND, refusedReason(foreignAccount));
+        assertEquals("Order ORD-999 not found", refusedMessage(unknownOrder));
+        assertEquals("Order " + order.getId() + " not found", refusedMessage(foreignAccount));
         assertEquals(OrderStatus.PENDING_CONFIRMATION, order.getStatus());
     }
 

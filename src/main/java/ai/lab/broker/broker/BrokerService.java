@@ -150,12 +150,12 @@ public class BrokerService {
         }
 
         Order order = optOrder.get();
+        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
+            return OrderDecision.Refused.orderNotFound(orderId);
+        }
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
-        }
-        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
-            return OrderDecision.Refused.orderNotOwned(orderId, accountId);
         }
         Account account = optAccount.get();
 
@@ -215,12 +215,12 @@ public class BrokerService {
         }
 
         Order order = optOrder.get();
+        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
+            return OrderDecision.Refused.orderNotFound(orderId);
+        }
         Optional<Account> optAccount = accountById(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
-        }
-        if (!Strings.CS.equals(order.getAccountId(), accountId)) {
-            return OrderDecision.Refused.orderNotOwned(orderId, accountId);
         }
 
         if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {

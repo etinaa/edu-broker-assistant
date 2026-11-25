@@ -18,24 +18,20 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 class OrderController {
 
-    static final String ACCOUNT_HEADER = "X-Account-Id";
-
     private final BrokerService broker;
 
     @GetMapping("/{id}")
-    Order order(@RequestHeader(ACCOUNT_HEADER) String accountId, @PathVariable String id) {
+    Order order(@RequestHeader(ChatController.ACCOUNT_HEADER) String accountId, @PathVariable String id) {
         return ownedOrder(accountId, id);
     }
 
     @PostMapping("/{id}/confirm")
-    Order confirm(@RequestHeader(ACCOUNT_HEADER) String accountId, @PathVariable String id) {
-        ownedOrder(accountId, id);
+    Order confirm(@RequestHeader(ChatController.ACCOUNT_HEADER) String accountId, @PathVariable String id) {
         return resultingOrder(broker.confirmOrder(accountId, id));
     }
 
     @PostMapping("/{id}/reject")
-    Order reject(@RequestHeader(ACCOUNT_HEADER) String accountId, @PathVariable String id) {
-        ownedOrder(accountId, id);
+    Order reject(@RequestHeader(ChatController.ACCOUNT_HEADER) String accountId, @PathVariable String id) {
         return resultingOrder(broker.rejectOrder(accountId, id));
     }
 
@@ -45,10 +41,16 @@ class OrderController {
                 .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
     }
 
+    /**
+     * confirm and reject check ownership in BrokerService under its lock, in one lookup: an unknown or foreign order
+     * is ORDER_NOT_FOUND → 404, any other refusal → 409.
+     */
     private static Order resultingOrder(OrderDecision decision) {
         return switch (decision) {
             case OrderDecision.Confirmed c -> c.order();
             case OrderDecision.Rejected r -> r.order();
+            case OrderDecision.Refused r when r.reason() == OrderDecision.Reason.ORDER_NOT_FOUND ->
+                    throw new NoSuchElementException(r.message());
             case OrderDecision.Refused r -> throw new OrderRefusedException(r);
             // confirm and reject never create an order: reaching this is a bug, answered as 500.
             case OrderDecision.Created c -> throw new IllegalStateException("Unexpected decision: " + c);

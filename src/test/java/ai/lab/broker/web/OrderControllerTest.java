@@ -113,11 +113,14 @@ class OrderControllerTest {
     }
 
     @Test
-    void confirmOfAnotherAccountsOrderIsNotFoundAndServiceNotCalled() throws Exception {
-        mvc.perform(post("/orders/ORD-1/confirm").header(HEADER, "BRK-2"))
-                .andExpect(status().isNotFound());
+    void confirmOfAnotherAccountsOrderIsNotFoundWithOneServiceCall() throws Exception {
+        when(broker.confirmOrder("BRK-2", "ORD-1")).thenReturn(OrderDecision.Refused.orderNotFound("ORD-1"));
 
-        verify(broker, never()).confirmOrder(any(), any());
+        mvc.perform(post("/orders/ORD-1/confirm").header(HEADER, "BRK-2"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Order ORD-1 not found"));
+
+        verify(broker, never()).orderById(any());
     }
 
     @Test
@@ -140,10 +143,10 @@ class OrderControllerTest {
     }
 
     @Test
-    void rejectOfAnotherAccountsOrderIsNotFoundAndServiceNotCalled() throws Exception {
+    void rejectOfAnotherAccountsOrderIsNotFound() throws Exception {
+        when(broker.rejectOrder("BRK-2", "ORD-1")).thenReturn(OrderDecision.Refused.orderNotFound("ORD-1"));
+
         mvc.perform(post("/orders/ORD-1/reject").header(HEADER, "BRK-2"))
                 .andExpect(status().isNotFound());
-
-        verify(broker, never()).rejectOrder(any(), any());
     }
 }

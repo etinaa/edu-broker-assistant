@@ -28,13 +28,9 @@ public sealed interface OrderDecision {
             return new Refused(Reason.ILLEGAL_ACCESS, "Account with accountId = " + accountId + " not found");
         }
 
+        /** Also for another account's order: the same text, so order ids of other accounts cannot be probed. */
         public static Refused orderNotFound(String orderId) {
-            return new Refused(Reason.ILLEGAL_ACCESS, "Order with orderId = " + orderId + " not found");
-        }
-
-        public static Refused orderNotOwned(String orderId, String accountId) {
-            return new Refused(Reason.ILLEGAL_ACCESS,
-                    "OrderId = " + orderId + " not related to accountId = " + accountId);
+            return new Refused(Reason.ORDER_NOT_FOUND, "Order " + orderId + " not found");
         }
 
         public static Refused cannotConfirm(OrderStatus status) {
@@ -97,7 +93,7 @@ public sealed interface OrderDecision {
 
     /** Machine-readable refusal category. */
     enum Reason {
-        ILLEGAL_ACCESS, INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY,
+        ILLEGAL_ACCESS, ORDER_NOT_FOUND, INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY,
         PRICE_CHANGED, ORDER_EXPIRED
     }
 }
