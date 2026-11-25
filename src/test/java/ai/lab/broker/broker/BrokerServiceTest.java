@@ -588,6 +588,34 @@ class BrokerServiceTest {
         assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
     }
 
+    // ---- cancelUnseenOrder ----
+
+    @Test
+    void unseenOrderIsCancelledBySystemNotRejectedByUser() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
+
+        assertTrue(service.cancelUnseenOrder("BRK-1", order.getId(), "chat failed"));
+
+        assertEquals(OrderStatus.CANCELLED, current(order).getStatus());
+        assertEquals("chat failed", current(order).getReason());
+        assertEquals("Can't confirm order with status = CANCELLED",
+                refusedMessage(service.confirmOrder("BRK-1", order.getId())));
+    }
+
+    @Test
+    void cancelUnseenOrderLeavesForeignMissingAndDecidedOrdersAlone() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
+        Order executed = placeOk("BRK-1", OrderSide.BUY, "TRNC", 1);
+        service.confirmOrder("BRK-1", executed.getId());
+
+        assertFalse(service.cancelUnseenOrder("BRK-2", order.getId(), "x"));
+        assertFalse(service.cancelUnseenOrder("BRK-1", "ORD-999", "x"));
+        assertFalse(service.cancelUnseenOrder("BRK-1", executed.getId(), "x"));
+
+        assertEquals(OrderStatus.PENDING_CONFIRMATION, current(order).getStatus());
+        assertEquals(OrderStatus.EXECUTED, current(executed).getStatus());
+    }
+
     // ---- rejectOrder ----
 
     @Test

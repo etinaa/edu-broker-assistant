@@ -125,7 +125,7 @@ class OrderControllerTest {
 
     @Test
     void rejectPassesHeaderAccountToService() throws Exception {
-        order.setStatus(OrderStatus.REJECTED_BY_USER, "Order cancelled by user");
+        order.setStatus(OrderStatus.REJECTED_BY_USER, "Order rejected by user");
         when(broker.rejectOrder("BRK-1", "ORD-1")).thenReturn(new OrderDecision.Rejected(order));
 
         mvc.perform(post("/orders/ORD-1/reject").header(HEADER, "BRK-1"))

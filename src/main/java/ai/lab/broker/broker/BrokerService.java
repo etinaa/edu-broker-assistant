@@ -235,12 +235,21 @@ public class BrokerService {
             return OrderDecision.Refused.cannotReject(order.getStatus());
         }
 
-        return new OrderDecision.Rejected(cancelOrder(order).snapshot());
+        order.setStatus(OrderStatus.REJECTED_BY_USER, "Order rejected by user");
+        return new OrderDecision.Rejected(order.snapshot());
     }
 
-    private Order cancelOrder(Order order) {
-        order.setStatus(OrderStatus.REJECTED_BY_USER, "Order cancelled by user");
-        return order;
+    /**
+     * Cancels an order the user never saw because the chat request that created it failed:
+     * PENDING_CONFIRMATION → CANCELLED, so the audit trail does not claim a user decision. Returns false and changes
+     * nothing for a missing or foreign order or one that is no longer pending.
+     */
+    public synchronized boolean cancelUnseenOrder(String accountId, String orderId, String reason) {
+        Optional<Order> order = liveOrder(orderId)
+                .filter(o -> Strings.CS.equals(o.getAccountId(), accountId))
+                .filter(o -> o.getStatus() == OrderStatus.PENDING_CONFIRMATION);
+        order.ifPresent(o -> o.setStatus(OrderStatus.CANCELLED, reason));
+        return order.isPresent();
     }
 
     /**

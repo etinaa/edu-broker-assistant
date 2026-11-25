@@ -241,7 +241,7 @@ class ChatIntegrationTest {
         var conversation = model.lastConversation();
         assertEquals(List.of("hi"), conversation.userMessages());
         assertTrue(conversation.toolResults().isEmpty());
-        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+        assertEquals(OrderStatus.CANCELLED, broker.orderById("ORD-1").orElseThrow().getStatus());
 
         chat("BRK-1", "s1", "buy 2 TRNC").andExpect(status().isOk());
         assertEquals(List.of("hi", "buy 2 TRNC"), conversation.userMessages());

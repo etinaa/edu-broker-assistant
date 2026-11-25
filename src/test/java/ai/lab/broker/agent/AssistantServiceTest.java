@@ -180,7 +180,7 @@ class AssistantServiceTest {
         RuntimeException e = assertThrows(RuntimeException.class, () -> service.chat("BRK-1", "s1", "buy 2 TRNC"));
 
         assertSame(toolResultsFailure, e);
-        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+        assertEquals(OrderStatus.CANCELLED, broker.orderById("ORD-1").orElseThrow().getStatus());
     }
 
     @Test
@@ -203,7 +203,7 @@ class AssistantServiceTest {
                 () -> failing.chat("BRK-1", "s1", "buy 2 TRNC")));
 
         assertEquals(0, conversation.size());
-        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+        assertEquals(OrderStatus.CANCELLED, broker.orderById("ORD-1").orElseThrow().getStatus());
     }
 
     @Test

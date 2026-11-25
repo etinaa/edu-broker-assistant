@@ -148,7 +148,7 @@ public class AssistantService {
         createdOrders(executed).forEach(body -> {
             String orderId = body.path("orderId").asText();
             log.warn("Cancelling order {} created by a failed chat request", orderId);
-            broker.rejectOrder(accountId, orderId);
+            broker.cancelUnseenOrder(accountId, orderId, "Cancelled: the chat request that created it failed");
         });
     }
 

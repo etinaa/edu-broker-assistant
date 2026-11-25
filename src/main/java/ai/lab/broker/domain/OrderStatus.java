@@ -9,6 +9,11 @@ public enum OrderStatus {
     /** Rejected by the user. */
     REJECTED_BY_USER,
     /**
+     * Cancelled by the system, not by the user: the chat request that created it failed, so the user never saw it
+     * and a retry would create it again.
+     */
+    CANCELLED,
+    /**
      * Confirmed, but the re-check at confirm time failed: not enough cash or securities any more, or the price moved
      * against the client by more than broker.max-price-move-percent.
      */
