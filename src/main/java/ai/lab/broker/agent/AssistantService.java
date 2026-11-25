@@ -10,10 +10,7 @@ import ai.lab.broker.llm.ToolConversationFactory;
 import ai.lab.broker.web.dto.ChatResponse;
 import ai.lab.broker.web.dto.ChatResponse.PendingOrder;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,11 +38,6 @@ public class AssistantService {
     /** Appended to an answer that hit the output length limit, so the user does not take it as complete. */
     static final String TRUNCATED_NOTE =
             "\n\n(The answer was cut off by the length limit. Ask me to continue or narrow the question.)";
-
-    /** Exact BigDecimal for floats, so cashAfter keeps its scale (9629.50, not 9629.5). */
-    private static final ObjectMapper JSON = new ObjectMapper()
-            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-            .configure(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES, false);
 
     private final ToolConversationFactory conversations;
     private final BrokerTools tools;
@@ -117,12 +109,7 @@ public class AssistantService {
             } catch (Throwable e) {
                 // Errors too (StackOverflowError in a tool): otherwise a tool_use without its tool_result stays in
                 // the history and every later message of the session is rejected by the provider.
-                try {
-                    conversation.truncate(sizeBefore);
-                    cancelCreatedOrders(accountId, executed);
-                } catch (Throwable cleanup) {
-                    e.addSuppressed(cleanup);
-                }
+                rollBack(conversation, sizeBefore, accountId, executed, e);
                 throw e;
             }
         } finally {
@@ -164,9 +151,7 @@ public class AssistantService {
         List<ToolResult> results = result.steps().stream()
                 .flatMap(step -> step.results().stream())
                 .toList();
-        String answer = result.limitReached() ? LIMIT_REACHED_ANSWER
-                : result.truncated() ? result.answer() + TRUNCATED_NOTE
-                : result.answer();
+        String answer = answerFor(result);
         PendingOrder pendingOrder = pendingOrder(results);
         List<Security> candidates = candidates(results);
 
@@ -205,6 +190,28 @@ public class AssistantService {
         }
     }
 
+    /** Undoes a failed message; a failure while undoing is attached to the original, which the caller rethrows. */
+    private void rollBack(ToolConversation conversation, int sizeBefore, String accountId, List<ToolResult> executed,
+                          Throwable failure) {
+        try {
+            conversation.truncate(sizeBefore);
+            cancelCreatedOrders(accountId, executed);
+        } catch (Throwable cleanup) {
+            failure.addSuppressed(cleanup);
+        }
+    }
+
+    /** The user never gets a fragment as if it were the whole answer. */
+    private static String answerFor(ToolLoop.Result result) {
+        if (result.limitReached()) {
+            return LIMIT_REACHED_ANSWER;
+        }
+        if (result.truncated()) {
+            return result.answer() + TRUNCATED_NOTE;
+        }
+        return result.answer();
+    }
+
     /** Orders the failed message created are rejected, so nothing the user never saw stays confirmable. */
     private void cancelCreatedOrders(String accountId, List<ToolResult> executed) {
         createdOrders(executed).forEach(body -> {
@@ -216,10 +223,7 @@ public class AssistantService {
 
     /** Results of place_order that created an order, in call order. */
     private static Stream<JsonNode> createdOrders(List<ToolResult> results) {
-        return results.stream()
-                .filter(result -> isSuccessOf(result, "place_order"))
-                .map(AssistantService::parse)
-                .filter(body -> "CREATED".equals(body.path("result").asText()));
+        return results.stream().map(ToolResults::createdOrder).flatMap(Optional::stream);
     }
 
     /** The last order created by place_order in this message, or null; the order is read from the order book. */
@@ -234,8 +238,8 @@ public class AssistantService {
     /** Securities to choose from, if the last find_security of this message returned CANDIDATES. */
     private List<Security> candidates(List<ToolResult> results) {
         return results.reversed().stream()
-                .filter(result -> isSuccessOf(result, "find_security"))
-                .map(AssistantService::parse)
+                .filter(result -> ToolResults.isSuccessOf(result, "find_security"))
+                .map(result -> ToolResults.parse(result.content()))
                 .findFirst()
                 .filter(body -> "CANDIDATES".equals(body.path("match").asText()))
                 .map(body -> StreamSupport.stream(body.path("securities").spliterator(), false)
@@ -243,18 +247,5 @@ public class AssistantService {
                         .flatMap(Optional::stream)
                         .toList())
                 .orElse(List.of());
-    }
-
-    private static boolean isSuccessOf(ToolResult result, String tool) {
-        return !result.error() && tool.equals(result.call().name());
-    }
-
-    /** Tool results are JSON written by {@link BrokerTools}; unparsable content counts as an empty object. */
-    private static JsonNode parse(ToolResult result) {
-        try {
-            return JSON.readTree(result.content());
-        } catch (Exception e) {
-            return JSON.createObjectNode();
-        }
     }
 }

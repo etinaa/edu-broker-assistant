@@ -40,7 +40,7 @@ class SingleOrderGuardTest {
         ToolResult second = apply("place_order");
 
         assertTrue(second.error());
-        assertEquals(SingleOrderGuard.ONE_ORDER.formatted("ORD-1", "ORD-1"), second.content());
+        assertEquals(SingleOrderGuard.ONE_ORDER.formatted("ORD-1"), second.content());
         assertEquals(List.of("place_order"), executed);
     }
 

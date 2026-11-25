@@ -3,9 +3,6 @@ package ai.lab.broker.agent;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.util.function.Function;
 
 /**
@@ -22,7 +19,6 @@ final class AmbiguityGuard implements Function<ToolCall, ToolResult> {
             + "not answer about any of them: list their tickers and names and ask the user which one they mean.";
 
     private static final String FIND_SECURITY = "find_security";
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Function<ToolCall, ToolResult> delegate;
     private boolean ambiguous;
@@ -38,7 +34,7 @@ final class AmbiguityGuard implements Function<ToolCall, ToolResult> {
         }
         ToolResult result = delegate.apply(call);
         if (FIND_SECURITY.equals(call.name()) && !result.error()) {
-            String match = matchOf(result.content());
+            String match = ToolResults.parse(result.content()).path("match").asText();
             if ("CANDIDATES".equals(match)) {
                 ambiguous = true;
             } else if ("EXACT".equals(match)) {
@@ -46,13 +42,5 @@ final class AmbiguityGuard implements Function<ToolCall, ToolResult> {
             }
         }
         return result;
-    }
-
-    private static String matchOf(String content) {
-        try {
-            return JSON.readTree(content).path("match").asText();
-        } catch (JsonProcessingException e) {
-            return "";
-        }
     }
 }

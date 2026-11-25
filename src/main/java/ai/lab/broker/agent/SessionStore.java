@@ -94,8 +94,8 @@ public class SessionStore {
             Map.Entry<Key, Session> entry = eldestFirst.next();
             boolean sameAccount = entry.getKey().accountId().equals(accountId);
             // Above only the account's limit, only that account's sessions may go.
-            boolean mayGo = sessions.size() > maxSessions || sameAccount;
-            if (mayGo && !entry.getKey().equals(created) && !entry.getValue().lock().isLocked()) {
+            boolean evictable = sessions.size() > maxSessions || sameAccount;
+            if (evictable && !entry.getKey().equals(created) && !entry.getValue().lock().isLocked()) {
                 eldestFirst.remove();
                 if (sameAccount) {
                     ofAccount--;

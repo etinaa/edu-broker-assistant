@@ -93,10 +93,15 @@ public class BrokerService {
     }
 
     private void expireIfOverdue(Order order) {
-        Instant deadline = order.getCreatedAt().plus(properties.orderTtl());
-        if (order.getStatus() == OrderStatus.PENDING_CONFIRMATION && Instant.now(clock).isAfter(deadline)) {
+        if (isOverdue(order)) {
             order.setStatus(OrderStatus.EXPIRED, "Not confirmed within " + properties.orderTtl());
         }
+    }
+
+    /** Still pending, but past its lifetime: EXPIRED as soon as somebody reads it. */
+    private boolean isOverdue(Order order) {
+        Instant deadline = order.getCreatedAt().plus(properties.orderTtl());
+        return order.getStatus() == OrderStatus.PENDING_CONFIRMATION && Instant.now(clock).isAfter(deadline);
     }
 
     /**
@@ -156,8 +161,7 @@ public class BrokerService {
 
     /** Executed, rejected, failed, cancelled or past its lifetime: nobody can act on it any more. */
     private boolean isFinished(Order order) {
-        expireIfOverdue(order);
-        return order.getStatus() != OrderStatus.PENDING_CONFIRMATION;
+        return order.getStatus() != OrderStatus.PENDING_CONFIRMATION || isOverdue(order);
     }
 
     /**
