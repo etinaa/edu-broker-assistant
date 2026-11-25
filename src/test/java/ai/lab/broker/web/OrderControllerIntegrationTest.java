@@ -135,7 +135,8 @@ class OrderControllerIntegrationTest {
 
         mvc.perform(post("/orders/" + second + "/confirm").header(HEADER, "BRK-2"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409));
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.reason").value("INSUFFICIENT_FUNDS"));
 
         assertEquals(18L, account("BRK-2").quantityByTicker("SMPL"));
     }

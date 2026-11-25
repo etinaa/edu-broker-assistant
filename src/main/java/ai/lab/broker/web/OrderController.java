@@ -49,7 +49,8 @@ class OrderController {
         return switch (decision) {
             case OrderDecision.Confirmed c -> c.order();
             case OrderDecision.Rejected r -> r.order();
-            case OrderDecision.Refused r -> throw new IllegalStateException(r.message());
+            case OrderDecision.Refused r -> throw new OrderRefusedException(r);
+            // confirm and reject never create an order: reaching this is a bug, answered as 500.
             case OrderDecision.Created c -> throw new IllegalStateException("Unexpected decision: " + c);
         };
     }

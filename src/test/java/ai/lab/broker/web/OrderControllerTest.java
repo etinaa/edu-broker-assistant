@@ -5,6 +5,7 @@ import ai.lab.broker.domain.Order;
 import ai.lab.broker.domain.OrderDecision;
 import ai.lab.broker.domain.OrderSide;
 import ai.lab.broker.domain.OrderStatus;
+import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -91,7 +94,22 @@ class OrderControllerTest {
 
         mvc.perform(post("/orders/ORD-1/confirm").header(HEADER, "BRK-1"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("Insufficient funds"));
+                .andExpect(jsonPath("$.detail").value("Insufficient funds"))
+                .andExpect(jsonPath("$.reason").value("INSUFFICIENT_FUNDS"));
+    }
+
+    /**
+     * A bug is not mapped to 409: no handler takes the IllegalStateException, so it propagates. MockMvc rethrows it;
+     * in a servlet container Spring Boot answers 500 without the exception text.
+     */
+    @Test
+    void unexpectedDecisionIsABugAndNotAConflict() {
+        when(broker.confirmOrder("BRK-1", "ORD-1")).thenReturn(
+                new OrderDecision.Created(order, new BigDecimal("9629.50")));
+
+        ServletException e = assertThrows(ServletException.class,
+                () -> mvc.perform(post("/orders/ORD-1/confirm").header(HEADER, "BRK-1")));
+        assertInstanceOf(IllegalStateException.class, e.getCause());
     }
 
     @Test

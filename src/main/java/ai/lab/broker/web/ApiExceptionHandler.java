@@ -30,9 +30,15 @@ class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
-    /** Например, подтверждение заявки, которая уже не PENDING_CONFIRMATION, если решишь отвечать так. */
-    @ExceptionHandler(IllegalStateException.class)
-    ProblemDetail conflict(IllegalStateException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    /**
+     * BrokerService refused to confirm or reject: 409 with the reason text and its code (PRICE_CHANGED,
+     * ORDER_EXPIRED, …) for the client. Other exceptions, IllegalStateException included, are bugs: Spring answers
+     * them with 500 and no message, so internal text does not leak and a bug does not look like a conflict.
+     */
+    @ExceptionHandler(OrderRefusedException.class)
+    ProblemDetail orderRefused(OrderRefusedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        problem.setProperty("reason", e.refusal().reason());
+        return problem;
     }
 }
