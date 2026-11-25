@@ -37,10 +37,11 @@ An unavailable provider, or an Ollama model that is not pulled, is skipped with 
 
 ## Latest run (2026-11-25, claude-haiku-4-5 and ollama/qwen3.5:9b)
 
-All ten scripts pass. One application fix came out of the runs: on "How many Training do I have?" the local
-model answered from `get_account_summary` without searching, because that tool's description offered it for
-"how many X do I have". The tool descriptions now send any security named by name through `find_security` first
-(commit `3519032`); see experiments 3 and 9.
+All ten scripts pass on a clean `experiments/results/`. The first run of experiment 10 failed one test,
+`aStreamedMessageThatFailsIsAnErrorEventAndIsRolledBack`: the test helper read a half-written event of the stream.
+It was fixed in `SseEvents` (experiment 8), and the rerun passed. Earlier, the runs led to one application fix:
+the tool descriptions send any security named by name through `find_security` first (commit `3519032`; see
+experiments 3 and 9).
 
 ## Common variables
 

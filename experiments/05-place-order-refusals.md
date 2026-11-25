@@ -48,21 +48,19 @@ spaces and commas are removed from the text before the search (4,100.00 → 4100
 - The account after the run is 10,000.00 USD, TRNC 20, SMPB 100, DEMO 5.
 - The comparison table has no mismatches (or each one is explained: rounding, another format, a model error).
 
-## Results
-
-Done: the four tools in `BrokerTools` are implemented and tested.
-
-2026-11-25, after the tool description change:
+## Results (2026-11-25)
 
 | | Correct | Steps | Per dialogue | HTTP |
 |---|---|---|---|---|
-| claude-haiku-4-5 | 6/6 | 2.2 | $0.0045 | ~2.6 s |
-| ollama/qwen3.5:9b | 6/6 | 3.0 | free | ~23.7 s |
+| claude-haiku-4-5 | 6/6 | 2.2 | $0.0046 | ~2.7 s |
+| ollama/qwen3.5:9b | 6/6 | 2.8 | free | ~22.2 s |
 
 - **Numbers:** 0 mismatches. Every number the code computed (price, total, cash after, needed, available,
   shortfall) appears in the model's text, on both models.
 - **Question 7:** Ollama answered "only 20 held" from `get_account_summary` without calling `place_order`, so
   there is no code refusal in the trace to compare with. The outcome is right, but here the model applied the rule
   itself; the code would have refused the same sale.
-- **Question 10:** Claude again asked about the fractional quantity without calling `place_order`; Ollama called it
-  and got the code's `INVALID_QUANTITY` refusal.
+- **Question 10:** Claude asked about the fractional quantity without calling `place_order`; Ollama called it and
+  got the code's `INVALID_QUANTITY` refusal.
+- **Question 9:** Ollama searched twice ("Tesla", "TSLA") and read the account before saying it is not available;
+  Claude searched once.

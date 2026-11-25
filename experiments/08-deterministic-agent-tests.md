@@ -40,9 +40,11 @@ RUNS=10 experiments/08-deterministic-agent-tests.sh
 
 Every group is green in every repeat; no network is needed anywhere.
 
-## Results
+## Results (2026-11-25)
 
-Done (item 3 in `tasks.txt`): a fake `ToolConversationFactory` and MockMvc tests of `/chat`; they give fast feedback
-before running on a real model.
+A fake `ToolConversationFactory` and MockMvc tests of `/chat` give fast feedback before running on a real model.
+All four scenarios are green, the whole suite is 360 tests, and the 56 agent tests passed three times in a row.
 
-2026-11-25: all groups green, 304 tests in the whole suite.
+The run of experiment 10 found one flaky test, `aStreamedMessageThatFailsIsAnErrorEventAndIsRolledBack`: the test
+helper `SseEvents` read the stream while an event was half written ("event:error", no data yet) and took it as
+the final event. It now parses only blocks that end with the blank line; 8 runs out of 8 passed after the fix.

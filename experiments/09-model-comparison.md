@@ -62,24 +62,21 @@ The text checks are rough: a FAIL is worth re-checking against the answer in `re
 
 ## Results (2026-11-25, claude-haiku-4-5 and ollama/qwen3.5:9b)
 
-| | Claude before → after | Ollama before → after |
+| | Claude | Ollama |
 |---|---|---|
-| Correct outcomes | 14/14 → 14/14 | 13/14 → **14/14** |
-| Average steps | 2.2 → 2.3 | 2.7 → 2.8 |
-| Average dialogue | $0.0045 → $0.0048, ~2.6 s | free, ~22.6 s → ~25.0 s |
-| Tokens per run (in/out) | 51,749/2,337 → 55,279/2,276 | 51,693/4,785 → 56,681/5,285 |
+| Correct outcomes | 14/14 | 14/14 |
+| Average steps | 2.2 | 2.6 |
+| Average dialogue | $0.0047, ~2.6 s | free, ~21.1 s |
+| Tokens per run (in/out) | 54,381/2,248 | 52,670/4,986 |
 
-"Before" and "after" are the tool description change of experiment 3 (commit `3519032`). The only failure before
-it was question 4 on Ollama: it answered "20 TRNC" from `get_account_summary` without searching. The cost of the
-fix is about 0.1 more steps per message, because a question about a security named by name now starts with
-`find_security`.
-
-- **Question 12 (who computed 53):** the model, on both. Ollama: `get_account_summary` → `find_security` →
-  `get_quote` → `place_order` 53. Claude: `get_account_summary` → `get_quote` → `place_order` **54** → refused for
-  insufficient funds → `place_order` 53. So Claude got the division wrong and the code's refusal corrected it.
-  This is the argument for `max_affordable_quantity` or `place_order` "for an amount": the code already checks the
-  total, and it could compute the quantity in one step instead of letting the model guess.
+- **Question 12 (who computed 53):** the model, on both. Claude: `get_account_summary` → `get_quote` →
+  `place_order` 53. Ollama: `get_account_summary` → `find_security` → `get_quote` → `place_order` 53. This time
+  both divided right on the first try; in an earlier run Claude ordered 54 and only the code's refusal brought it
+  to 53, and with a fee both needed refusals (experiment 10). The code already checks the total, so a
+  `max_affordable_quantity` tool or `place_order` "for an amount" would compute the quantity in one step instead
+  of letting the model guess.
 - **Question 10:** Claude asked about the fractional quantity without tools; Ollama called `place_order` and got
   `INVALID_QUANTITY` from the code.
-- **Speed:** the slowest Ollama answers were questions 11 and 12, about 54–55 s each, at 4 steps.
+- **Question 7:** Claude got the code's refusal; Ollama refused itself from `get_account_summary`.
+- **Speed:** the slowest Ollama answer was question 12, 56 s at 4 steps; then questions 9 and 11, ~30 s.
 - **No money moved:** no order was executed without `/confirm`.

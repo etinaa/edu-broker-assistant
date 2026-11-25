@@ -80,24 +80,27 @@ refused the first one) and whether the fee from `pendingOrder` appears in the mo
 Done: `TradeCost` and `broker.fee-percent`/`broker.min-fee`, `TypoSuggestions` with the rules in `AmbiguityGuard`
 and `GroundedExecutor`, `POST /chat/stream` (`ChatStreams`, `ChatListener` in `ToolLoop`).
 
-2026-11-25, `broker.fee-percent=2`, `broker.min-fee=1` (after a fix of two checks in the script, rerun on Claude):
+2026-11-25, `broker.fee-percent=2`, `broker.min-fee=1`; all checks passed:
 
 | | A. Fee | B. Typos | C. Stream: first event / response / `/chat` |
 |---|---|---|---|
-| claude-haiku-4-5 | 4/4 | 4/4 | 1.1 s / 2.4 s / 2.9 s |
-| ollama/qwen3.5:9b | 4/4 | 4/4 | 9.2 s / 21.6 s / 19.2 s |
+| claude-haiku-4-5 | 4/4 | 4/4 | 1.0 s / 2.2 s / 2.3 s |
+| ollama/qwen3.5:9b | 4/4 | 4/4 | 9.1 s / 20.8 s / 18.7 s |
 
-- **The code computed the quantity again, through refusals.** On "Buy TRNC with all my money" Claude ordered 53,
-  got the code's refusal (10,014.62 with the fee) and then ordered 52; Ollama went 54 → 53 → 52, six tool calls and
-  108 s. Both ended at the right 52 only because the code checks the total with the fee. This confirms the case
-  for `max_affordable_quantity` or an order "for an amount" from experiment 9.
+- **The code corrected the quantity through a refusal.** On "Buy TRNC with all my money" both models ordered 53
+  (cash divided by the price, no fee), got the code's refusal (10,014.62 with the fee) and then ordered 52.
+  Claude took 4 tool calls and 6.4 s, Ollama 5 calls and 88 s; in an earlier run Ollama went 54 → 53 → 52. Both
+  ended at the right 52 only because the code checks the total with the fee. This confirms the case for
+  `max_affordable_quantity` or an order "for an amount" from experiment 9.
 - **The fee is not always in the text.** All totals in `pendingOrder` and the refusals included the fee on both
   models, and the account after `/confirm` paid 4,182.00. Claude named the fee in every answer; Ollama left it
-  out on "Sell 10 TRNC" and on the TRNC purchase. The structure is right either way.
+  out on "Sell 10 TRNC". The structure is right either way.
 - **No order on a guess.** "Buy 10 DEMA" gave "Did you mean DEMO?" and no order on both models, "Yes" gave the
   order. On "How many Trainig do I have?" Claude searched for "Training" itself and got `CANDIDATES`; Ollama showed
   the suggestions. On "Buy Tesla shares" Ollama searched twice and read the account before answering; no order.
 - **Streaming:** the events were in order on both models and the response matched `/chat`. The first event came
-  after the first model step: 1.3 s before the response on Claude, 12 s on Ollama. A second stream of a busy
+  after the first model step: 1.2 s before the response on Claude, 11.7 s on Ollama. A second stream of a busy
   session got an `error` event with 409; an unknown account and an empty `sessionId` were 404 and 400 before the
   stream.
+- **A flaky test:** the first run failed `aStreamedMessageThatFailsIsAnErrorEventAndIsRolledBack`; the cause was
+  the test helper, not the stream (see experiment 8).

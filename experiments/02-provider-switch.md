@@ -45,7 +45,6 @@ PROVIDERS=ollama experiments/02-provider-switch.sh   # one provider only
 ## Results (2026-11-25)
 
 Checked live with no code change, only `LLM_PROVIDER`: claude/claude-haiku-4-5 and ollama/qwen3.5:9b answered both
-questions the same way, with the same tool calls; the model shows in the trace. Claude without a key and an
-unknown provider do not start.
-
-The script, before and after the tool description change: all checks passed both times.
+questions with the same tool calls (`get_account_summary`, `get_quote`); the model shows in the trace. Claude took
+2.1 and 1.5 s, Ollama 12.5 and 9.8 s. Claude without a key and the unknown provider `openai` do not start, and the
+reason is in the log. All checks passed.

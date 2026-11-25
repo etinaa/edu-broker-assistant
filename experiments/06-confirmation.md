@@ -41,12 +41,14 @@ SHORT_TTL_SECONDS=10 experiments/06-confirmation.sh
 
 Every checklist item is ticked; the (b) tests pass.
 
-## Results
+## Results (2026-11-25, ollama/qwen3.5:9b)
 
-Done (item 5 in `tasks.txt`): (a) only the first order is confirmed, the second FAILED short by 2,300.00;
-(b) execution at the current price, a move against the client of more than 2% → `PRICE_CHANGED`, in the client's
-favour — executed; (c) an overdue order is EXPIRED when read or confirmed; (d) a repeated confirm changes nothing.
+All checks passed: the tests of (a)–(d) and every live check of (a), (c) and (d).
 
-2026-11-25, ollama/qwen3.5:9b: every live check of (a), (c) and (d) passed, before and after the
-tool description change. The second 15 DEMO order failed with "needed 6150.00 USD, available 3850.00 USD, short by
-2300.00 USD"; the order with a 20 s lifetime was EXPIRED on the next read and its confirm got `ORDER_EXPIRED`.
+- **(a)** Two orders for 15 DEMO (6,150.00 each) were created; the first was executed, the second got 409
+  `INSUFFICIENT_FUNDS` "needed 6150.00 USD, available 3850.00 USD, short by 2300.00 USD" and became FAILED. Cash in
+  the end 3,850.00.
+- **(b)** Tests only: the price cannot be changed over HTTP.
+- **(c)** The order with a 20 s lifetime was EXPIRED on the next read, its confirm got 409 `ORDER_EXPIRED`, cash
+  stayed 10,000.00.
+- **(d)** A repeated confirm and a reject of an executed order are 409; cash did not change (3,440.00).

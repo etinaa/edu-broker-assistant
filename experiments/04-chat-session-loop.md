@@ -44,7 +44,15 @@ PROVIDER=claude experiments/04-chat-session-loop.sh
 
 Every checklist item in `report.md` is ticked; question 8 is PASS in the table.
 
-## Results
+## Results (2026-11-25, ollama/qwen3.5:9b)
 
-Done (items 1–2 in `tasks.txt`): a session with a lock, history trimmed by whole exchanges, an honest answer on
-`limitReached`, the trace through `Trace.Step.from`, provider errors as 502 with a clear message.
+All checks passed.
+
+- **Question 8:** the candidates SMPB and SMPL, then "Logistics" → an order for 100 SMPL; 4 steps over two
+  messages, ~29 s.
+- **Reset:** after `DELETE /chat/{id}` (204) "Logistics" gave no order: the history was gone.
+- **Trace:** the message, the model and steps with tokens, cost and latency; with account BRK-2 the same trace
+  is 404.
+- **Step limit** (`agent.max-steps=1`): `limitReached: true`, the answer "I could not finish this request within
+  the step limit…", no order.
+- **Busy session:** two parallel messages gave 200 and 409.

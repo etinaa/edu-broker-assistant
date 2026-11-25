@@ -53,8 +53,8 @@ SKIP_LIVE=1 experiments/01-domain-without-llm.sh   # tests only
 An order cannot be created over HTTP without the model (there is no `POST /orders`), so `placeOrder`, `confirm`
 and `reject` are checked by tests only.
 
-## Results
+## Results (2026-11-25)
 
 The script report: `experiments/results/01-domain-without-llm-<time>/report.md`.
 
-2026-11-25: all checks passed — 118 domain tests, 32 HTTP tests, and every live check.
+All checks passed: 119 domain tests, 32 HTTP tests, and every live check.

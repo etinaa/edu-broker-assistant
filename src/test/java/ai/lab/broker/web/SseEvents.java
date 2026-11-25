@@ -43,7 +43,13 @@ final class SseEvents {
 
     private static List<Event> parse(String body) throws IOException {
         List<Event> events = new ArrayList<>();
-        for (String block : body.split("\n\n")) {
+        // An event is written in parts ("event:", then the data, then the blank line), and the body is read while the
+        // stream is still being written: only blocks that already end with the blank line are complete.
+        int end = body.lastIndexOf("\n\n");
+        if (end < 0) {
+            return events;
+        }
+        for (String block : body.substring(0, end).split("\n\n")) {
             String name = null;
             StringBuilder data = new StringBuilder();
             for (String line : block.split("\n")) {

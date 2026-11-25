@@ -44,29 +44,24 @@ The text checks are rough (regular expressions); the full answers are in `report
 - Question 4: how many of the `REPEAT_Q4` repeats ended with a question to the user, and which tools the model
   tried to call after `find_security` (`AmbiguityGuard` refuses them; the trace shows them as errors).
 
-## Results (2026-11-25)
+## Results (2026-11-25, claude-haiku-4-5 and ollama/qwen3.5:9b)
 
-On question 4 Ollama (qwen3.5:9b) never called `find_security`. The `get_account_summary`
-description offered that tool for "how many X do I have", so the model read the summary, saw "Training Corp.
-common stock" (TRNC is the only Training security in the account) and answered "20 TRNC". Without a search there
-are no `CANDIDATES`, and `AmbiguityGuard` has nothing to enforce.
+| | Correct | Steps | Per dialogue | HTTP |
+|---|---|---|---|---|
+| claude-haiku-4-5 | 6/6 | 2.2 | $0.0043 | ~2.2 s |
+| ollama/qwen3.5:9b | 6/6 | 2.0 | free | ~12.9 s |
 
-Fix in the tool descriptions (commit `3519032`): the summary example became "how many TRNC do I have", and both
-`get_account_summary` and `find_security` say to call `find_security` first when the user names a security by
-name rather than an exact ticker or ISIN.
+Question 4 repeated 5 times per model: the options were offered 5/5 on both, with no tools other than `find_security`.
 
-| ollama/qwen3.5:9b, options offered | Before | After |
-|---|---|---|
-| How many Training do I have? | 0/5 | 5/5, then 10/10 in this script |
-| Buy 10 Training | 5/5 | 5/5 |
-| Sell 10 Training | — | 5/5 |
-
-Claude offered the options in every repeat both before and after (5/5, then 10/10). Questions 1–4, 13, 14 after
-the fix: 6/6 on both models; Claude 2.2 steps and $0.0042 per dialogue, ~2.0 s; Ollama 2.2 steps, ~12.8 s.
+- **Question 4:** both models called `find_security`, got `CANDIDATES` and offered TRNC, TRNP and TREN.
+- **Question 2:** Claude searched for "Sample Bank" and then read the account; Ollama read only the account. Both
+  answered 100 SMPB.
 
 ### Conclusion
 
 Each layer covers a different failure. The code (`AmbiguityGuard`) stops the model from picking one candidate,
-but only once it has searched. Whether it searches at all is decided by the tool descriptions. A description is
-not a guarantee: if another model skips the search again, the next step is in code, an optional `query`
-parameter of `get_account_summary` that goes through the same search.
+but only once it has searched. Whether it searches at all is decided by the tool descriptions: before commit
+`3519032` the `get_account_summary` description offered that tool for "how many X do I have", and the local model
+answered "20 TRNC" on question 4 without a search. A description is not a guarantee: if another model skips the
+search again, the next step is in code, an optional `query` parameter of `get_account_summary` that goes through
+the same search.

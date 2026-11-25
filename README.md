@@ -95,9 +95,9 @@ All ten tasks are done.
 
 | | Claude | Ollama |
 |---|---|---|
-| Correct outcomes on the 14 test questions | 14/14 | 14/14 (13/14 before the fix below) |
-| Average steps per message | 2.3 | 2.8 |
-| Average dialogue | $0.0048, ~2.6 s | free, ~25 s |
+| Correct outcomes on the 14 test questions | 14/14 | 14/14 |
+| Average steps per message | 2.2 | 2.6 |
+| Average dialogue | $0.0047, ~2.6 s | free, ~21 s |
 
 What the experiments showed:
 
@@ -107,19 +107,21 @@ What the experiments showed:
   guarantee is the code, not the prompt.
 - **Each layer catches a different mistake.** On "How many Training do I have?" the local model skipped the
   search and answered from the account summary, so `AmbiguityGuard` in code had nothing to enforce; the fix was
-  the tool descriptions (0/5 → 10/10). Code enforces a rule once the model is on the right path; descriptions
+  the tool descriptions (0/5 → 5/5 in every run since). Code enforces a rule once the model is on the right path; descriptions
   decide whether it gets there.
 - **Numbers in the text matched the code.** No mismatches between the model's text and `pendingOrder` or the
   refusals on the order questions, on both models.
-- **The model does arithmetic, and the code corrects it.** On "buy TRNC with all my money" Claude first ordered
-  54 shares, got the code's refusal for insufficient funds, and then ordered 53. This is the argument for a
-  `max_affordable_quantity` tool or an order "for an amount": the code already checks the total and could
-  compute the quantity itself.
-- **A fee makes the model's arithmetic wrong, and the code still catches it.** With a 2% fee "all my money" is 52
-  TRNC, not 53. Claude ordered 53 and then 52; the local model went 54 → 53 → 52. Every total with the fee came
-  from the code, while the local model sometimes left the fee out of its text.
+- **The model does arithmetic, and the code corrects it.** On "buy TRNC with all my money" both models compute
+  the quantity themselves. Without a fee they got 53 right on the first try, though in an earlier run Claude
+  ordered 54 and only the code's refusal brought it to 53. With a 2% fee the answer is 52: both ordered 53, got
+  the refusal and then ordered 52. This is the argument for a `max_affordable_quantity` tool or an order "for an
+  amount": the code already checks the total and could compute the quantity itself.
+- **The fee is in the numbers, not always in the text.** Every total with the fee came from the code; the local
+  model sometimes left the fee out of its answer.
 - **A typo gives a question, not a guess.** "Buy 10 DEMA" gives "Did you mean DEMO?" and no order on both models;
   the user's "Yes" then creates it.
+- **Streaming shows progress, not a faster answer.** With `/chat/stream` the first event comes after the first
+  model step: 1.0 s instead of 2.2 s on Claude, 9 s instead of 21 s on the local model.
 - **A local model is a usable fallback, not a replacement.** It reached the same outcomes, for free, but about ten
   times slower and with more steps, and it needed stricter tool descriptions to get there.
 
