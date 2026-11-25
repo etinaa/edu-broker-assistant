@@ -35,6 +35,7 @@ class AssistantServiceTest {
     private final List<ToolConversation.ToolResult> toolResults = new ArrayList<>();
     private int created;
     private RuntimeException failure;
+    private RuntimeException toolResultsFailure;
 
     private BrokerService broker;
     private TraceStore traces;
@@ -173,6 +174,25 @@ class AssistantServiceTest {
         assertFalse(e.getMessage().contains("secret"));
     }
 
+    @Test
+    void bugInOurCodeIsNotDisguisedAsProviderFailureAndIsRolledBack() throws Exception {
+        callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
+        toolResultsFailure = new IllegalArgumentException("bug");
+
+        RuntimeException e = assertThrows(RuntimeException.class, () -> service.chat("BRK-1", "s1", "buy 2 TRNC"));
+
+        assertSame(toolResultsFailure, e);
+        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+    }
+
+    @Test
+    void nonPositiveMaxStepsIsRejectedAtStartup() {
+        AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100);
+
+        assertThrows(IllegalArgumentException.class, () -> new AssistantService((system, tools) -> null,
+                new BrokerTools(broker), broker, new SessionStore(zeroSteps), new TraceStore(zeroSteps), zeroSteps));
+    }
+
     private static final class JsonAssert {
         static void cash(String json, String expected) throws Exception {
             assertEquals(0, new BigDecimal(expected).compareTo(MAPPER.readTree(json).get("cash").decimalValue()));
@@ -199,6 +219,9 @@ class AssistantServiceTest {
 
         @Override
         public void addToolResults(List<ToolResult> results) {
+            if (toolResultsFailure != null) {
+                throw toolResultsFailure;
+            }
             toolResults.addAll(results);
             size++;
         }

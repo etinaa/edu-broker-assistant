@@ -57,6 +57,9 @@ public class AssistantService {
         this.sessions = sessions;
         this.traces = traces;
         this.agent = agent;
+        if (agent.maxSteps() <= 0) {
+            throw new IllegalArgumentException("agent.max-steps must be positive: " + agent.maxSteps());
+        }
     }
 
     /**
@@ -70,9 +73,10 @@ public class AssistantService {
      *       model's text.</li>
      *   <li>pendingOrder and candidates are built from this message's tool results, not from the model's text.</li>
      * </ol>
-     * Provider failures (network, 429, 5xx) become {@link AssistantUnavailableException} without provider details.
-     * The failed message leaves no trace in the session: the history is rolled back to where it was before it, and
-     * orders created during it are cancelled. The user never saw them, and a retry must not leave a duplicate.
+     * Provider failures (network, 429, 5xx) become {@link AssistantUnavailableException} without provider details;
+     * any other exception is a bug in our code and propagates as is, so it is not disguised as a provider outage.
+     * Either way the failed message leaves no trace in the session: the history is rolled back to where it was
+     * before it, and orders created during it are cancelled. The user never saw them, and a retry must not leave a duplicate.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
         ToolConversation conversation = sessions.getOrCreate(accountId, sessionId,
@@ -90,7 +94,7 @@ public class AssistantService {
                     executed.add(toolResult);
                     return toolResult;
                 });
-            } catch (AssistantUnavailableException e) {
+            } catch (RuntimeException e) {
                 conversation.truncate(sizeBefore);
                 cancelCreatedOrders(accountId, executed);
                 throw e;
@@ -121,8 +125,8 @@ public class AssistantService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssistantUnavailableException("The request to the model was interrupted", e);
-        } catch (Exception e) {
-            log.error("Model provider failed for {}", conversation.name(), e);
+        } catch (ModelCallException e) {
+            log.error("Model provider failed for {}", conversation.name(), e.getCause());
             throw new AssistantUnavailableException("The model is unavailable right now, please try again later", e);
         }
     }
