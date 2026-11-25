@@ -15,7 +15,7 @@ llm:
   ollama:
     base-url: http://localhost:11434
     model: "${OLLAMA_MODEL:qwen2.5:14b}"
-    # Context window: the session history plus the tool definitions must fit in it (lesson 1.5).
+    # Context window: the session history plus the tool definitions must fit in it.
     num-ctx: 16384
 
 agent:

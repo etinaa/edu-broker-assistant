@@ -13,8 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Local model via Ollama (POST /api/chat). Carried over from stage1-llm-basics and reduced to the request with
- * tools; the server address, model and context window come from configuration.
+ * Local model via Ollama (POST /api/chat): only the request with tools; the server address, model and context window come from configuration.
  */
 public class OllamaClient {
 

@@ -5,11 +5,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 
 /**
- * Provider-independent tool conversation (carried over from lesson 1.4). An implementation keeps the history in
+ * Provider-independent tool conversation. An implementation keeps the history in
  * its API's format (tool_use/tool_result blocks for Claude, tool_calls and the tool role for Ollama), while the
  * loop sees only call requests and results.
  * <p>
- * Unlike lesson 1.4, a conversation outlives a single question: it is the user's session. So the first question
+ * A conversation outlives a single question: it is the user's session. So the first question
  * is not passed to the constructor; every new message is added with {@link #addUserMessage(String)}.
  */
 public interface ToolConversation {

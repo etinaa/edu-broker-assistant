@@ -1,6 +1,6 @@
 # Experiments
 
-One experiment per task of [`docs/stage1-final-README.md`](../../docs/stage1-final-README.md): the description is
+One experiment per [task](../README.md#tasks) of the project: the description is
 in `NN-*.md`, and `NN-*.sh` runs it from any directory.
 
 | # | Task | Description | Script | Model needed |
@@ -35,11 +35,9 @@ An unavailable provider, or an Ollama model that is not pulled, is skipped with 
   `chats.jsonl` (raw `/chat` responses and traces), the application and `mvn test` logs. The directory is in
   `.gitignore`: logs and traces hold account data.
 - Exit code 0 means all checks passed, 1 means some failed (they show as `FAIL` in `report.md`).
-- The questions are sent in English. The Russian originals are in `docs/stage1-final-README.md`. Each "Results"
-  section says which wording its numbers come from: the first runs of 2026-11-25 used Russian, the later ones
-  English.
+- The questions are in `lib/questions.sh`.
 
-## Latest run (2026-11-25, English wording, claude-haiku-4-5 and ollama/qwen3.5:9b)
+## Latest run (2026-11-25, claude-haiku-4-5 and ollama/qwen3.5:9b)
 
 All nine scripts pass. One application fix came out of the runs: on "How many Training do I have?" the local
 model answered from `get_account_summary` without searching, because that tool's description offered it for

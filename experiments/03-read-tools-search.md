@@ -46,16 +46,7 @@ The text checks are rough (regular expressions); the full answers are in `report
 
 ## Results (2026-11-25)
 
-### Russian wording
-
-- Before `AmbiguityGuard`, Ollama (qwen3.5:9b) got `CANDIDATES` on question 4 but picked TRNC itself (the response
-  still had three `candidates`). Claude asked.
-- After `nextStep` in the `find_security` result and `AmbiguityGuard` in the code: 5/5 — the model lists the
-  options and asks.
-
-### English wording
-
-The guard did not help with the English question: Ollama never called `find_security`. The `get_account_summary`
+On question 4 Ollama (qwen3.5:9b) never called `find_security`. The `get_account_summary`
 description offered that tool for "how many X do I have", so the model read the summary, saw "Training Corp.
 common stock" (TRNC is the only Training security in the account) and answered "20 TRNC". Without a search there
 are no `CANDIDATES`, and `AmbiguityGuard` has nothing to enforce.

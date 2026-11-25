@@ -50,10 +50,9 @@ spaces and commas are removed from the text before the search (4,100.00 → 4100
 
 ## Results
 
-Done: the four tools in `BrokerTools` are implemented and tested. In the 2026-11-25 run (experiment 9, Russian
-wording), questions 5–10 passed on both models; Claude refused question 10 itself, without `place_order`.
+Done: the four tools in `BrokerTools` are implemented and tested.
 
-2026-11-25, English wording, after the tool description change:
+2026-11-25, after the tool description change:
 
 | | Correct | Steps | Per dialogue | HTTP |
 |---|---|---|---|---|

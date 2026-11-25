@@ -1,8 +1,8 @@
 # Getting ready to run
 
 How to bring up `edu-broker-assistant` on a clean machine: what to install, which variables and properties
-to fill in, and how to check that everything works. What the project does is described in
-[`docs/stage1-final-README.md`](../docs/stage1-final-README.md).
+to fill in, and how to check that everything works. What the project does and its tasks are described in
+[`README.md`](README.md).
 
 ## 1. What to install
 

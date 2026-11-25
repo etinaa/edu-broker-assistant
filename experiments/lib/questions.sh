@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The 14 questions from docs/stage1-final-README.md, with an outcome check on the response structure and the trace.
+# The 14 test questions of the project, with an outcome check on the response structure and the trace.
 # Source it after common.sh.
 
 # jq helpers: $r is the /chat response, $t its trace. num drops spaces, no-break spaces and commas (10,000.00 → 10000.00).

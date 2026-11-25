@@ -48,4 +48,4 @@ Checked live with no code change, only `LLM_PROVIDER`: claude/claude-haiku-4-5 a
 questions the same way, with the same tool calls; the model shows in the trace. Claude without a key and an
 unknown provider do not start.
 
-The script with the English wording, before and after the tool description change: all checks passed both times.
+The script, before and after the tool description change: all checks passed both times.

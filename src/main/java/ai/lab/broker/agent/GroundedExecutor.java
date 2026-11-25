@@ -17,7 +17,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * Checks arguments against what the model has actually seen (from lesson 1.4, task 5). A ticker in the arguments
+ * Checks arguments against what the model has actually seen. A ticker in the arguments
  * must appear in the user's messages or in successful tool results, otherwise the model "corrected" or made it up.
  * <p>
  * Task 7: {@link AssistantService} creates one per message, seeded with {@code ToolConversation.seen()}, i.e. the

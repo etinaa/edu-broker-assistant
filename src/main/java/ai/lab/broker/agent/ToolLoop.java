@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * The "while the model asks for a call, run it" loop (from lesson 1.4). A step is one request to the model;
+ * The "while the model asks for a call, run it" loop. A step is one request to the model;
  * the step limit is required, otherwise the model could call tools forever.
  */
 @Slf4j
