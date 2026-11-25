@@ -79,43 +79,51 @@ public class AssistantService {
      * </ol>
      * Provider failures (network, 429, 5xx) become {@link AssistantUnavailableException} without provider details;
      * any other exception is a bug in our code and propagates as is, so it is not disguised as a provider outage.
-     * Either way the failed message leaves no trace in the session: the history is rolled back to where it was
-     * before it, and orders created during it are cancelled. The user never saw them, and a retry must not leave a duplicate.
+     * Either way, and also when building the response or saving the trace fails, the failed message leaves no trace
+     * in the session: the history is rolled back to where it was before it, and orders created during it are
+     * cancelled. The user never saw them, and a retry must not leave a duplicate.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
         ToolConversation conversation = sessions.getOrCreate(accountId, sessionId,
                 () -> conversations.create(SystemPrompt.TEXT, tools.definitions()));
 
-        ToolLoop.Result result;
         synchronized (conversation) {
             sessions.fitHistory(conversation);
             int sizeBefore = conversation.size();
             List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
             try {
-                result = runLoop(conversation, new GroundedExecutor(conversation.seen(), call -> {
+                ToolLoop.Result result = runLoop(conversation, new GroundedExecutor(conversation.seen(), call -> {
                     ToolResult toolResult = tools.execute(accountId, call);
                     executed.add(toolResult);
                     return toolResult;
                 }));
+                // Built inside the try: until the response exists, the user has seen nothing of this message.
+                return respond(accountId, sessionId, message, conversation.name(), result);
             } catch (RuntimeException e) {
                 conversation.truncate(sizeBefore);
                 cancelCreatedOrders(accountId, executed);
                 throw e;
             }
         }
+    }
 
+    /** The structured response and its trace; the trace is saved last, so a failure here leaves no trace behind. */
+    private ChatResponse respond(String accountId, String sessionId, String message, String model,
+                                 ToolLoop.Result result) {
         List<ToolResult> results = result.steps().stream()
                 .flatMap(step -> step.results().stream())
                 .toList();
         String answer = result.limitReached() ? LIMIT_REACHED_ANSWER : result.answer();
+        PendingOrder pendingOrder = pendingOrder(results);
+        List<Security> candidates = candidates(results);
 
-        Trace trace = new Trace(traces.nextId(), accountId, sessionId, message, conversation.name(),
+        Trace trace = new Trace(traces.nextId(), accountId, sessionId, message, model,
                 result.steps().stream().map(Trace.Step::from).toList(),
                 answer, result.limitReached(), Instant.now());
         traces.save(trace);
 
-        return new ChatResponse(answer, pendingOrder(results), candidates(results), result.limitReached(), trace.id());
+        return new ChatResponse(answer, pendingOrder, candidates, result.limitReached(), trace.id());
     }
 
     /** New session with an empty history. */

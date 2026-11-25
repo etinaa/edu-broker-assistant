@@ -184,6 +184,29 @@ class AssistantServiceTest {
     }
 
     @Test
+    void failureAfterTheLoopRollsBackHistoryAndCancelsTheOrder() throws Exception {
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100);
+        RuntimeException traceFailure = new IllegalArgumentException("trace store bug");
+        TraceStore failingTraces = new TraceStore(agent) {
+            @Override
+            public synchronized void save(Trace trace) {
+                throw traceFailure;
+            }
+        };
+        ScriptedConversation conversation = new ScriptedConversation();
+        AssistantService failing = new AssistantService((system, tools) -> conversation, new BrokerTools(broker),
+                broker, new SessionStore(agent), failingTraces, agent);
+        callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
+        answers("Order created");
+
+        assertSame(traceFailure, assertThrows(RuntimeException.class,
+                () -> failing.chat("BRK-1", "s1", "buy 2 TRNC")));
+
+        assertEquals(0, conversation.size());
+        assertEquals(OrderStatus.REJECTED_BY_USER, broker.orderById("ORD-1").orElseThrow().getStatus());
+    }
+
+    @Test
     void nonPositiveMaxStepsIsRejectedAtStartup() {
         AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100);
 
