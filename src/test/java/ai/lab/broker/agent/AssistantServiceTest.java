@@ -40,6 +40,7 @@ class AssistantServiceTest {
     private int created;
     private RuntimeException failure;
     private RuntimeException toolResultsFailure;
+    private Error toolResultsError;
     /** When set, the model "thinks" inside send() until the test releases it: a long model call. */
     private volatile CountDownLatch sendEntered;
     private volatile CountDownLatch sendRelease;
@@ -209,6 +210,22 @@ class AssistantServiceTest {
     }
 
     @Test
+    void errorDuringTheLoopAlsoRollsBackHistoryAndCancelsTheOrder() throws Exception {
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2));
+        ScriptedConversation conversation = new ScriptedConversation();
+        AssistantService erroring = new AssistantService((system, tools) -> conversation, new BrokerTools(broker),
+                broker, new SessionStore(agent), traces, agent);
+        callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
+        toolResultsError = new StackOverflowError();
+
+        assertSame(toolResultsError, assertThrows(StackOverflowError.class,
+                () -> erroring.chat("BRK-1", "s1", "buy 2 TRNC")));
+
+        assertEquals(0, conversation.size());
+        assertEquals(OrderStatus.CANCELLED, broker.orderById("ORD-1").orElseThrow().getStatus());
+    }
+
+    @Test
     void failureAfterTheLoopRollsBackHistoryAndCancelsTheOrder() throws Exception {
         AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2));
         RuntimeException traceFailure = new IllegalArgumentException("trace store bug");
@@ -325,6 +342,9 @@ class AssistantServiceTest {
         public void addToolResults(List<ToolResult> results) {
             if (toolResultsFailure != null) {
                 throw toolResultsFailure;
+            }
+            if (toolResultsError != null) {
+                throw toolResultsError;
             }
             toolResults.addAll(results);
             size++;

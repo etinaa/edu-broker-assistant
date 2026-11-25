@@ -112,9 +112,15 @@ public class AssistantService {
                         })));
                 // Built inside the try: until the response exists, the user has seen nothing of this message.
                 return respond(accountId, sessionId, message, conversation.name(), result);
-            } catch (RuntimeException e) {
-                conversation.truncate(sizeBefore);
-                cancelCreatedOrders(accountId, executed);
+            } catch (Throwable e) {
+                // Errors too (StackOverflowError in a tool): otherwise a tool_use without its tool_result stays in
+                // the history and every later message of the session is rejected by the provider.
+                try {
+                    conversation.truncate(sizeBefore);
+                    cancelCreatedOrders(accountId, executed);
+                } catch (Throwable cleanup) {
+                    e.addSuppressed(cleanup);
+                }
                 throw e;
             }
         } finally {
