@@ -63,7 +63,7 @@ for i in 1 2; do
   pids="$pids $!"
 done
 for pid in $pids; do wait "$pid" || true; done
-codes="$(cat "$RESULTS_DIR/busy-1.code" "$RESULTS_DIR/busy-2.code" | sort | tr '\n' ' ')"
+codes="$(for i in 1 2; do cat "$RESULTS_DIR/busy-$i.code"; echo; done | sort | tr "\n" " ")"
 log "    response codes: $codes"
 for i in 1 2; do log "    $i: $(cut -c1-200 "$RESULTS_DIR/busy-$i.json")"; done
 assert "one message is processed, the other gets 409 \"session busy\"" test "$codes" = "200 409 "

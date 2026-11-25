@@ -28,7 +28,7 @@ for provider in ${PROVIDERS:-claude ollama}; do
     if eval_check "$(question_check 4 1)"; then verdict=asked; else verdict=guessed; fi
     picked="$(jq -r '[.steps[]?.calls[]? | select(.tool != "find_security") | "\(.tool) \(.arguments)"] | join("; ")' <<<"$TRACE")"
     log "- repeat $i: **$verdict**; candidates: $(jq -r '[.candidates[]?.ticker] | join(",")' <<<"$RESP");" \
-      "other tools after the search: ${picked:-none}; answer: $(jq -r '.answer // .detail // ""' <<<"$RESP" | tr '\n' ' ' | cut -c1-150)"
+      "tools other than find_security: ${picked:-none}; answer: $(jq -r '.answer // .detail // ""' <<<"$RESP" | tr '\n' ' ' | cut -c1-150)"
     printf '%s\n' "$verdict" >>"$RESULTS_DIR/q4-$provider.tsv"
   done
   asked="$(grep -c '^asked$' "$RESULTS_DIR/q4-$provider.tsv" || true)"

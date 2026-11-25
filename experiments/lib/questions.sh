@@ -84,7 +84,9 @@ QUESTIONS_HEADER='| # | Expected | Outcome | Steps | Tools | Tokens in/out | Cos
 # writes a table row to $RESULTS_DIR/table-<label>.md and the raw numbers to $RESULTS_DIR/stats-<label>.tsv.
 # Every exchange in detail goes to report.md.
 run_question() {
-  local n="$1" label="$2" session="q$1-$2-$RANDOM" turn=0 msg
+  local n="$1" label="$2" turn=0 msg session
+  # sessionId allows only letters, digits, - and _ (a model name like qwen3.5:9b has more)
+  session="$(printf "q%s-%s-%s" "$1" "$2" "$RANDOM" | tr -c "A-Za-z0-9_-" "_" | cut -c1-64)"
   local steps=0 tin=0 tout=0 cost=0 lat=0 wall=0 tools="" ok=1 answer=""
   local s ti to c l tl
   log "### Question $n ($label). Expected: $(question_expect "$n")"
