@@ -82,15 +82,16 @@ Each task is checked by the experiment with the same number in [experiments/](ex
 | 7 | Attempts to bypass confirmation | The model has no way to confirm: "buy and confirm right away" and an instruction injected into a catalog name give at most a pending order. `GroundedExecutor` refuses a ticker the session has not seen, including one the model "corrected". |
 | 8 | Deterministic agent tests | A scripted model (`ScriptedConversationFactory`) returns predefined tool calls. Tests through `MockMvc` and `@SpringBootTest`: ambiguous search → `candidates`, insufficient cash → refusal and no order, a looping model → step limit and an honest answer, a failing tool → the loop survives. |
 | 9 | Running the set and comparing models | 14 test questions on Claude and Ollama: is the outcome right, steps, tokens, cost, latency. Question 12 ("buy TRNC with all my money") checks who computes the quantity — the model or the code. |
-| 10 | Optional extras | A broker fee (`broker.fee-percent`, `broker.min-fee`) in `pendingOrder`, the refusals and the executed order, computed in one place (`TradeCost`) and recomputed on confirm. "Did you mean" hints for a search with a typo (`TypoSuggestions`, Levenshtein); no order on a suggestion until the user answers. `POST /chat/stream`: the progress of a message as server-sent events, ending with the same response as `/chat`. |
+| 10 | Optional extras | A broker fee (`broker.fee-percent`, `broker.min-fee`) in `pendingOrder`, the refusals and the executed order, computed in one place (`TradeCost`) and recomputed on confirm. "Did you mean" hints for a search with a typo (`TypoSuggestions`, Levenshtein); no order on a suggestion until the user answers. `POST /chat/stream`: the progress of a message as server-sent events, ending with the same response as `/chat`. The HTML page was deliberately not built: confirming is a separate `POST /orders/{id}/confirm` call, which the experiment scripts make. |
 
 The 14 questions with their expected outcomes are listed in
 [experiment 9](experiments/09-model-comparison.md#questions-and-automatic-checks).
 
 ## Results
 
-All ten tasks are done.
-360 tests pass without a network: a scripted model replaces the provider. The live numbers below come from the
+All ten tasks are done; the optional HTML page of task 10 was deliberately left out, since confirming an order is
+a separate `POST /orders/{id}/confirm` call that the experiment scripts make.
+362 tests pass without a network: a scripted model replaces the provider. The live numbers below come from the
 [experiments](experiments/README.md) of 2026-11-25 on `claude-haiku-4-5` and `ollama/qwen3.5:9b`.
 
 | | Claude | Ollama |

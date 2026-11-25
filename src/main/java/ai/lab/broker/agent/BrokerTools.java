@@ -84,7 +84,7 @@ public class BrokerTools {
     static final String PLACE_ORDER = """
             {
               "name": "place_order",
-              "description": "Create an order to buy (BUY) or sell (SELL) a security. The order is NOT executed: it waits until the user confirms it in the UI. Returns either the created order (orderId, price, the broker fee, total including the fee, cash left after the trade) or a refusal with the reason and numbers. The ticker must come from a find_security result or be exactly as the user named it.",
+              "description": "Create an order to buy (BUY) or sell (SELL) a security. The order is NOT executed: it waits until the user confirms it separately, outside this chat. Returns either the created order (orderId, price, the broker fee, total including the fee, cash left after the trade) or a refusal with the reason and numbers. The ticker must come from a find_security result or be exactly as the user named it.",
               "input_schema": {
                 "type": "object",
                 "properties": {
