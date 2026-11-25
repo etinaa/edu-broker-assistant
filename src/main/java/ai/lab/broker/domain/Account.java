@@ -3,6 +3,7 @@ package ai.lab.broker.domain;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -10,11 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * Brokerage account: cash in USD and positions (ticker → quantity). Not synchronized by itself;
  * {@code BrokerService} serializes the operations that change it.
  */
-@Getter
 public class Account {
 
+    @Getter
     private final String id;
     private final Map<String, Long> positions;
+    @Getter
     private BigDecimal cash;
 
     public Account(String id, BigDecimal cash) {
@@ -26,6 +28,11 @@ public class Account {
     public Account(String id, BigDecimal cash, Map<String, Long> positions) {
         this(id, cash);
         this.positions.putAll(positions);
+    }
+
+    /** A read-only view: positions change only through {@link #add} and {@link #subtract}, with the cash. */
+    public Map<String, Long> getPositions() {
+        return Collections.unmodifiableMap(positions);
     }
 
     public long quantityByTicker(String ticker) {

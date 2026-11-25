@@ -110,13 +110,13 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.limitReached").value(false)));
 
         // The model only prepared the order: money has not moved until the user confirms.
-        assertEquals(0, new BigDecimal("10000.00").compareTo(broker.accountById("BRK-1").orElseThrow().getCash()));
+        assertEquals(0, new BigDecimal("10000.00").compareTo(broker.accountSnapshot("BRK-1").orElseThrow().getCash()));
 
         String orderId = response.path("pendingOrder").path("orderId").asText();
         mvc.perform(post("/orders/" + orderId + "/confirm").header(HEADER, "BRK-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("EXECUTED"));
-        assertEquals(0, new BigDecimal("9629.50").compareTo(broker.accountById("BRK-1").orElseThrow().getCash()));
+        assertEquals(0, new BigDecimal("9629.50").compareTo(broker.accountSnapshot("BRK-1").orElseThrow().getCash()));
     }
 
     @Test

@@ -50,7 +50,7 @@ class ChatController {
     }
 
     private void requireAccount(String accountId) {
-        if (broker.accountById(accountId).isEmpty()) {
+        if (!broker.accountExists(accountId)) {
             throw new NoSuchElementException("Account " + accountId + " not found");
         }
     }

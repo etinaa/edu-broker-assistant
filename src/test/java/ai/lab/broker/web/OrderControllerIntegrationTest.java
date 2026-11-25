@@ -52,7 +52,7 @@ class OrderControllerIntegrationTest {
     }
 
     private Account account(String id) {
-        return broker.accountById(id).orElseThrow();
+        return broker.accountSnapshot(id).orElseThrow();
     }
 
     @Test

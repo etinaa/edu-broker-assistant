@@ -56,7 +56,15 @@ public class BrokerService {
         return securities.byTicker(ticker);
     }
 
-    public Optional<Account> accountById(String accountId) {
+    public boolean accountExists(String accountId) {
+        return accounts.byId(accountId).isPresent();
+    }
+
+    /**
+     * The stored account itself, for changes under the lock; never handed out. Outside callers read
+     * {@link #accountSnapshot(String)}, so cash and positions change only through the synchronized operations.
+     */
+    private Optional<Account> liveAccount(String accountId) {
         return accounts.byId(accountId);
     }
 
@@ -65,7 +73,7 @@ public class BrokerService {
      * each other and with the last completed operation, even while a confirmation is changing the account.
      */
     public synchronized Optional<Account> accountSnapshot(String accountId) {
-        return accountById(accountId)
+        return liveAccount(accountId)
                 .map(account -> new Account(account.getId(), account.getCash(), account.getPositions()));
     }
 
@@ -104,7 +112,7 @@ public class BrokerService {
      * Think about whether the balance check should account for other pending orders (task 6a).
      */
     public synchronized OrderDecision placeOrder(String accountId, OrderSide side, String ticker, long quantity) {
-        Optional<Account> optAccount = accountById(accountId);
+        Optional<Account> optAccount = liveAccount(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
         }
@@ -161,7 +169,7 @@ public class BrokerService {
         if (!Strings.CS.equals(order.getAccountId(), accountId)) {
             return OrderDecision.Refused.orderNotFound(orderId);
         }
-        Optional<Account> optAccount = accountById(accountId);
+        Optional<Account> optAccount = liveAccount(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
         }
@@ -226,7 +234,7 @@ public class BrokerService {
         if (!Strings.CS.equals(order.getAccountId(), accountId)) {
             return OrderDecision.Refused.orderNotFound(orderId);
         }
-        Optional<Account> optAccount = accountById(accountId);
+        Optional<Account> optAccount = liveAccount(accountId);
         if (optAccount.isEmpty()) {
             return OrderDecision.Refused.accountNotFound(accountId);
         }

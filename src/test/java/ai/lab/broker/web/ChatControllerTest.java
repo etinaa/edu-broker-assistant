@@ -3,7 +3,6 @@ package ai.lab.broker.web;
 import ai.lab.broker.agent.AssistantService;
 import ai.lab.broker.agent.SessionBusyException;
 import ai.lab.broker.broker.BrokerService;
-import ai.lab.broker.domain.Account;
 import ai.lab.broker.web.dto.ChatResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,9 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -41,7 +38,7 @@ class ChatControllerTest {
 
     @Test
     void chatPassesAccountFromHeaderToAssistant() throws Exception {
-        when(broker.accountById("BRK-2")).thenReturn(Optional.of(new Account("BRK-2", new BigDecimal("100.00"))));
+        when(broker.accountExists("BRK-2")).thenReturn(true);
         when(assistant.chat("BRK-2", "s1", "hi"))
                 .thenReturn(new ChatResponse("ok", null, List.of(), false, "t1"));
 
@@ -53,7 +50,7 @@ class ChatControllerTest {
 
     @Test
     void chatForUnknownAccountIs404AndModelIsNotCalled() throws Exception {
-        when(broker.accountById("NOPE")).thenReturn(Optional.empty());
+        when(broker.accountExists("NOPE")).thenReturn(false);
 
         mvc.perform(post("/chat").header("X-Account-Id", "NOPE")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -64,7 +61,7 @@ class ChatControllerTest {
 
     @Test
     void busySessionIs409() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(broker.accountExists("BRK-1")).thenReturn(true);
         when(assistant.chat("BRK-1", "s1", "hi")).thenThrow(new SessionBusyException());
 
         mvc.perform(post("/chat").header("X-Account-Id", "BRK-1")
@@ -81,7 +78,7 @@ class ChatControllerTest {
 
     @Test
     void resetSessionIsScopedToAccount() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(broker.accountExists("BRK-1")).thenReturn(true);
 
         mvc.perform(delete("/chat/s1").header("X-Account-Id", "BRK-1"))
                 .andExpect(status().isNoContent());
@@ -91,7 +88,7 @@ class ChatControllerTest {
 
     @Test
     void tooLongOrUnusualSessionIdIs400AndModelIsNotCalled() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(broker.accountExists("BRK-1")).thenReturn(true);
 
         for (String sessionId : new String[]{"x".repeat(65), "has space", "../etc", "s\\n1"}) {
             String body = "{\"sessionId\":\"" + sessionId + "\",\"message\":\"hi\"}";
@@ -105,7 +102,7 @@ class ChatControllerTest {
 
     @Test
     void sessionIdOfLettersDigitsDashAndUnderscoreIsAccepted() throws Exception {
-        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(broker.accountExists("BRK-1")).thenReturn(true);
         when(assistant.chat("BRK-1", "web_Tab-1", "hi"))
                 .thenReturn(new ChatResponse("ok", null, List.of(), false, "t1"));
 

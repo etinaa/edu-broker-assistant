@@ -37,6 +37,14 @@ class AccountTest {
     }
 
     @Test
+    void positionsCannotBeChangedPastAddAndSubtract() {
+        Account a = new Account("acc-3", BigDecimal.TEN, Map.of("SBER", 5L));
+
+        assertThrows(UnsupportedOperationException.class, () -> a.getPositions().put("SBER", 1_000L));
+        assertEquals(5L, a.quantityByTicker("SBER"));
+    }
+
+    @Test
     void quantityByTickerReturnsZeroForUnknownTicker() {
         assertEquals(0L, account.quantityByTicker("GAZP"));
     }
