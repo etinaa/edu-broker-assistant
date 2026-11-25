@@ -9,7 +9,7 @@ import java.time.Duration;
 /** BrokerService on the demo data with the rules from application.yml: orders live 5 minutes, price move 2%. */
 public final class TestBroker {
 
-    public static final BrokerProperties PROPERTIES = new BrokerProperties(Duration.ofMinutes(5), new BigDecimal("2"));
+    public static final BrokerProperties PROPERTIES = new BrokerProperties(Duration.ofMinutes(5), new BigDecimal("2"), 10_000);
 
     private TestBroker() {
     }
@@ -19,6 +19,11 @@ public final class TestBroker {
     }
 
     public static BrokerService with(SecurityCatalog catalog, OrderBook orders, Clock clock) {
-        return new BrokerService(catalog, new AccountRepository(), orders, PROPERTIES, clock);
+        return with(catalog, orders, clock, PROPERTIES);
+    }
+
+    public static BrokerService with(SecurityCatalog catalog, OrderBook orders, Clock clock,
+                                     BrokerProperties properties) {
+        return new BrokerService(catalog, new AccountRepository(), orders, properties, clock);
     }
 }

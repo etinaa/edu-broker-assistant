@@ -131,6 +131,7 @@ run. What can be tuned:
 |---|---|---|
 | `broker.order-ttl` | `5m` | an order not confirmed within this time becomes `EXPIRED` |
 | `broker.max-price-move-percent` | `2` | how far the price may move against the client before confirm; more is a `PRICE_CHANGED` refusal |
+| `broker.max-orders` | `10000` | orders kept in memory; above it the oldest finished or expired ones are removed, pending ones are kept |
 
 Debugging: `logging.level.llm-payload: DEBUG` prints the raw requests to and responses from the models. They contain the whole conversation and the client's cash and positions, so enable it only locally.
 

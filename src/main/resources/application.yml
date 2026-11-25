@@ -34,6 +34,8 @@ broker:
   order-ttl: 5m
   # How far the price may move against the client (BUY: up, SELL: down) before confirm fails with PRICE_CHANGED.
   max-price-move-percent: 2
+  # Orders kept in memory; above it the oldest finished or expired ones are removed. Pending orders are kept.
+  max-orders: 10000
 
 management:
   endpoints:

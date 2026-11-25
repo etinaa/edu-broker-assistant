@@ -150,7 +150,14 @@ public class BrokerService {
         String orderId = orders.nextId();
         Order order = new Order(orderId, accountId, side, ticker, quantity, price, Instant.now(clock));
         orders.add(order);
+        orders.evictOldest(properties.maxOrders(), this::isFinished);
         return order;
+    }
+
+    /** Executed, rejected, failed, cancelled or past its lifetime: nobody can act on it any more. */
+    private boolean isFinished(Order order) {
+        expireIfOverdue(order);
+        return order.getStatus() != OrderStatus.PENDING_CONFIRMATION;
     }
 
     /**

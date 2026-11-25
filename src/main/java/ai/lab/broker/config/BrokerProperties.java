@@ -11,11 +11,13 @@ import java.time.Duration;
  *   <li>orderTtl — how long an order waits for confirmation; after that it is EXPIRED;</li>
  *   <li>maxPriceMovePercent — how far the price may move against the client between placing and confirming
  *       (up for BUY, down for SELL) before the order fails with PRICE_CHANGED; a move in the client's favour
- *       is always allowed.</li>
+ *       is always allowed;</li>
+ *   <li>maxOrders — how many orders are kept in memory; above it the oldest finished or expired orders are
+ *       removed (a removed order is then not found). Pending orders are never removed: they expire after orderTtl.</li>
  * </ul>
  */
 @ConfigurationProperties(prefix = "broker")
-public record BrokerProperties(Duration orderTtl, BigDecimal maxPriceMovePercent) {
+public record BrokerProperties(Duration orderTtl, BigDecimal maxPriceMovePercent, int maxOrders) {
 
     public BrokerProperties {
         if (orderTtl == null || orderTtl.isNegative() || orderTtl.isZero()) {
@@ -24,6 +26,9 @@ public record BrokerProperties(Duration orderTtl, BigDecimal maxPriceMovePercent
         if (maxPriceMovePercent == null || maxPriceMovePercent.signum() < 0) {
             throw new IllegalArgumentException(
                     "broker.max-price-move-percent must be zero or positive: " + maxPriceMovePercent);
+        }
+        if (maxOrders <= 0) {
+            throw new IllegalArgumentException("broker.max-orders must be positive: " + maxOrders);
         }
     }
 }

@@ -1,5 +1,6 @@
 package ai.lab.broker.broker;
 
+import ai.lab.broker.config.BrokerProperties;
 import ai.lab.broker.domain.*;
 import ai.lab.broker.domain.OrderDecision.Reason;
 import ai.lab.broker.domain.SearchResult.Match;
@@ -149,6 +150,34 @@ class BrokerServiceTest {
         assertEquals(OrderStatus.PENDING_CONFIRMATION, read.getStatus());
         assertEquals(OrderStatus.PENDING_CONFIRMATION, placed.getStatus());
         assertEquals(OrderStatus.EXECUTED, current(placed).getStatus());
+    }
+
+    @Test
+    void finishedAndExpiredOrdersAreEvictedAboveTheLimitButPendingOnesStay() {
+        BrokerProperties small = new BrokerProperties(TestBroker.PROPERTIES.orderTtl(),
+                TestBroker.PROPERTIES.maxPriceMovePercent(), 2);
+        BrokerService bounded = TestBroker.with(catalog, orders, clock, small);
+
+        Order rejected = assertInstanceOf(OrderDecision.Created.class,
+                bounded.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 1)).order();
+        bounded.rejectOrder("BRK-1", rejected.getId());
+        Order pending = assertInstanceOf(OrderDecision.Created.class,
+                bounded.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 1)).order();
+        Order third = assertInstanceOf(OrderDecision.Created.class,
+                bounded.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 1)).order();
+
+        assertTrue(bounded.orderById(rejected.getId()).isEmpty(), "finished order is evicted");
+        assertTrue(bounded.orderById(pending.getId()).isPresent());
+        assertTrue(bounded.orderById(third.getId()).isPresent());
+
+        bounded.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 1);
+        assertEquals(3, orders.all().size(), "pending orders are kept above the limit");
+
+        clock.advance(small.orderTtl().plusSeconds(1));
+        Order fresh = assertInstanceOf(OrderDecision.Created.class,
+                bounded.placeOrder("BRK-1", OrderSide.BUY, "DEMO", 1)).order();
+        assertEquals(2, orders.all().size(), "expired orders are evicted");
+        assertTrue(bounded.orderById(fresh.getId()).isPresent());
     }
 
     @Test

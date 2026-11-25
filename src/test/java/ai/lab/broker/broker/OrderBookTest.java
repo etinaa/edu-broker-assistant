@@ -31,6 +31,29 @@ class OrderBookTest {
     }
 
     @Test
+    void evictOldestRemovesOnlyAllowedOrdersOldestFirst() {
+        Order kept = order("ORD-1");
+        Order oldFinished = order("ORD-2");
+        Order newFinished = order("ORD-3");
+        Order newest = order("ORD-4");
+        List.of(kept, oldFinished, newFinished, newest).forEach(book::add);
+
+        int removed = book.evictOldest(2, o -> !o.getId().equals("ORD-1"));
+
+        assertEquals(2, removed);
+        assertEquals(List.of(kept, newest), book.all());
+    }
+
+    @Test
+    void evictOldestKeepsEverythingWhenNothingMayGo() {
+        List.of(order("ORD-1"), order("ORD-2"), order("ORD-3")).forEach(book::add);
+
+        assertEquals(0, book.evictOldest(1, o -> false));
+        assertEquals(3, book.all().size());
+        assertEquals(0, book.evictOldest(5, o -> true));
+    }
+
+    @Test
     void nextIdStartsAtOneAndIncrements() {
         assertEquals("ORD-1", book.nextId());
         assertEquals("ORD-2", book.nextId());
