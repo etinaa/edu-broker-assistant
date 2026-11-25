@@ -11,10 +11,13 @@ import java.time.Duration;
  *       (see {@code SessionStore});</li>
  *   <li>maxSessions, maxTraces — how many sessions and traces are kept in memory; the least recently used session
  *       and the oldest trace are evicted first, so a client creating new sessionIds cannot exhaust the heap;</li>
+ *   <li>maxSessionsPerAccount — how many sessions one account keeps; its own least recently used session goes
+ *       first, so one account creating new sessionIds cannot push out the sessions of the others;</li>
  *   <li>sessionBusyTimeout — how long a message or a reset waits for another message of the same session to be
  *       answered before it is refused with 409.</li>
  * </ul>
  */
 @ConfigurationProperties(prefix = "agent")
 public record AgentProperties(int maxSteps, double temperature, int maxHistoryMessages,
-                              int maxSessions, int maxTraces, Duration sessionBusyTimeout) {}
+                              int maxSessions, int maxSessionsPerAccount, int maxTraces,
+                              Duration sessionBusyTimeout) {}

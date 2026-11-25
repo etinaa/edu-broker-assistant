@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TraceStoreTest {
 
     private static TraceStore store(int maxTraces) {
-        return new TraceStore(new AgentProperties(6, 0.0, 40, 100, maxTraces, Duration.ofSeconds(2)));
+        return new TraceStore(new AgentProperties(6, 0.0, 40, 100, 100, maxTraces, Duration.ofSeconds(2)));
     }
 
     private static Trace trace(TraceStore store) {

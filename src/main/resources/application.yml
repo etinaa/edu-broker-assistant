@@ -25,6 +25,8 @@ agent:
   max-history-messages: 40
   # Sessions and traces kept in memory; the least recently used session and the oldest trace go first.
   max-sessions: 1000
+  # Sessions one account keeps; its own least recently used one goes first, so it cannot evict other accounts'.
+  max-sessions-per-account: 20
   max-traces: 1000
   # How long a message waits for another message of the same session before 409 "session busy".
   session-busy-timeout: 2s

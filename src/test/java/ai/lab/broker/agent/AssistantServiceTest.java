@@ -51,12 +51,12 @@ class AssistantServiceTest {
     @BeforeEach
     void setUp() {
         broker = TestBroker.demo();
-        traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2)));
+        traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2)));
         service = new AssistantService((system, tools) -> {
             created++;
             return new ScriptedConversation();
-        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2))), traces,
-                new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2)));
+        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2))), traces,
+                new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2)));
     }
 
     private static LlmResponse response(String text) {
@@ -210,7 +210,7 @@ class AssistantServiceTest {
 
     @Test
     void failureAfterTheLoopRollsBackHistoryAndCancelsTheOrder() throws Exception {
-        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2));
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2));
         RuntimeException traceFailure = new IllegalArgumentException("trace store bug");
         TraceStore failingTraces = new TraceStore(agent) {
             @Override
@@ -233,7 +233,7 @@ class AssistantServiceTest {
 
     @Test
     void busySessionRefusesAnotherMessageAndResetWhileOtherSessionsWork() throws Exception {
-        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofMillis(50));
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofMillis(50));
         AssistantService busy = new AssistantService((system, tools) -> new ScriptedConversation(),
                 new BrokerTools(broker), broker, new SessionStore(agent), traces, agent);
         answers("first");
@@ -277,7 +277,7 @@ class AssistantServiceTest {
 
     @Test
     void negativeSessionBusyTimeoutIsRejectedAtStartup() {
-        AgentProperties negative = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofMillis(-1));
+        AgentProperties negative = new AgentProperties(3, 0.0, 40, 100, 100, 100, Duration.ofMillis(-1));
 
         assertThrows(IllegalArgumentException.class, () -> new AssistantService((system, tools) -> null,
                 new BrokerTools(broker), broker, new SessionStore(negative), new TraceStore(negative), negative));
@@ -285,7 +285,7 @@ class AssistantServiceTest {
 
     @Test
     void nonPositiveMaxStepsIsRejectedAtStartup() {
-        AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100, Duration.ofSeconds(2));
+        AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100, 100, Duration.ofSeconds(2));
 
         assertThrows(IllegalArgumentException.class, () -> new AssistantService((system, tools) -> null,
                 new BrokerTools(broker), broker, new SessionStore(zeroSteps), new TraceStore(zeroSteps), zeroSteps));

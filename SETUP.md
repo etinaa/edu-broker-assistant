@@ -122,6 +122,7 @@ run. What can be tuned:
 | `agent.temperature` | `0.0` | the model temperature |
 | `agent.max-history-messages` | `40` | the session history length; the oldest exchanges are dropped whole |
 | `agent.max-sessions` | `1000` | sessions kept in memory; the least recently used one is evicted |
+| `agent.max-sessions-per-account` | `20` | sessions one account keeps; its own least recently used one is evicted, never another account's or a busy one |
 | `agent.max-traces` | `1000` | traces kept in memory; the oldest one is evicted |
 | `agent.session-busy-timeout` | `2s` | how long a message waits for another message of the same session before 409 |
 

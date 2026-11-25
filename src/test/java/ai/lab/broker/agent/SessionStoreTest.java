@@ -16,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SessionStoreTest {
 
     private static SessionStore store(int maxHistoryMessages) {
-        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages, 100, 100, Duration.ofSeconds(2)));
+        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages, 100, 100, 100, Duration.ofSeconds(2)));
     }
 
     private static SessionStore storeWithMaxSessions(int maxSessions) {
-        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, 100, Duration.ofSeconds(2)));
+        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, maxSessions, 100, Duration.ofSeconds(2)));
     }
 
     @Test
@@ -64,6 +64,52 @@ class SessionStoreTest {
         assertSame(first, store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1)));
         ToolConversation fresh = new FakeConversation(1);
         assertSame(fresh, store.getOrCreate("BRK-1", "b", () -> fresh).conversation());
+    }
+
+    private static SessionStore storeWithLimits(int maxSessions, int maxSessionsPerAccount) {
+        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, maxSessionsPerAccount, 100,
+                Duration.ofSeconds(2)));
+    }
+
+    @Test
+    void accountAboveItsLimitEvictsItsOwnSessionNotAnotherAccounts() {
+        SessionStore store = storeWithLimits(100, 2);
+        SessionStore.Session victim = store.getOrCreate("BRK-1", "mine", () -> new FakeConversation(1));
+        SessionStore.Session flooderFirst = store.getOrCreate("BRK-2", "x1", () -> new FakeConversation(1));
+        for (int i = 2; i <= 50; i++) {
+            store.getOrCreate("BRK-2", "x" + i, () -> new FakeConversation(1));
+        }
+
+        assertTrue(store.isCurrent("BRK-1", "mine", victim), "another account's session stays");
+        assertFalse(store.isCurrent("BRK-2", "x1", flooderFirst));
+        assertEquals(3, store.size());
+    }
+
+    @Test
+    void busySessionIsNeverEvicted() {
+        SessionStore store = storeWithLimits(2, 2);
+        SessionStore.Session busy = store.getOrCreate("BRK-1", "busy", () -> new FakeConversation(1));
+        SessionStore.Session idle = store.getOrCreate("BRK-1", "idle", () -> new FakeConversation(1));
+        busy.lock().lock();
+        try {
+            store.getOrCreate("BRK-1", "new", () -> new FakeConversation(1));
+
+            assertTrue(store.isCurrent("BRK-1", "busy", busy));
+            assertFalse(store.isCurrent("BRK-1", "idle", idle));
+
+            idle = store.getOrCreate("BRK-1", "idle", () -> new FakeConversation(1));
+            store.getOrCreate("BRK-1", "newer", () -> new FakeConversation(1));
+            store.getOrCreate("BRK-1", "newest", () -> new FakeConversation(1));
+            assertTrue(store.isCurrent("BRK-1", "busy", busy), "still kept while all others went");
+            assertEquals(2, store.size());
+        } finally {
+            busy.lock().unlock();
+        }
+    }
+
+    @Test
+    void maxSessionsPerAccountMustBePositive() {
+        assertThrows(IllegalArgumentException.class, () -> storeWithLimits(10, 0));
     }
 
     @Test

@@ -5,6 +5,7 @@ import ai.lab.broker.llm.ToolConversation;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +25,11 @@ import java.util.function.Supplier;
  * The number of sessions is bounded by {@code agent.max-sessions}: the least recently used session is evicted when
  * a new one does not fit. sessionId is chosen by the client, so without the bound every new id would stay in memory
  * forever. An evicted session simply starts over with an empty history.
+ * <p>
+ * Eviction must not let one client hurt another: an account keeps at most {@code agent.max-sessions-per-account},
+ * and a new session beyond it evicts that account's own least recently used session, not someone else's. A session
+ * whose lock is held (a message is being answered) is never evicted, so an answer is not written into a forgotten
+ * history; while every candidate is busy the store may stay above its limit.
  * <p>
  * Each session has its own lock: one message of a session at a time. {@link AssistantService} holds it for the
  * whole answer (model calls included) and takes it with a timeout, so a second message is refused instead of
@@ -45,6 +51,8 @@ public class SessionStore {
     /** Access order: get() moves a session to the end, so the eldest entry is the least recently used. */
     private final Map<Key, Session> sessions;
     private final int maxHistoryMessages;
+    private final int maxSessions;
+    private final int maxSessionsPerAccount;
 
     public SessionStore(AgentProperties agent) {
         if (agent.maxHistoryMessages() <= 0) {
@@ -53,19 +61,47 @@ public class SessionStore {
         if (agent.maxSessions() <= 0) {
             throw new IllegalArgumentException("agent.max-sessions must be positive");
         }
+        if (agent.maxSessionsPerAccount() <= 0) {
+            throw new IllegalArgumentException("agent.max-sessions-per-account must be positive");
+        }
         this.maxHistoryMessages = agent.maxHistoryMessages();
-        int maxSessions = agent.maxSessions();
-        this.sessions = new LinkedHashMap<>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<Key, Session> eldest) {
-                return size() > maxSessions;
-            }
-        };
+        this.maxSessions = agent.maxSessions();
+        this.maxSessionsPerAccount = agent.maxSessionsPerAccount();
+        this.sessions = new LinkedHashMap<>(16, 0.75f, true);
     }
 
     /** The factory only builds an object (no network call), so holding the store's lock while it runs is cheap. */
     public synchronized Session getOrCreate(String accountId, String sessionId, Supplier<ToolConversation> factory) {
-        return sessions.computeIfAbsent(new Key(accountId, sessionId), key -> new Session(factory.get()));
+        Key key = new Key(accountId, sessionId);
+        Session existing = sessions.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        Session created = new Session(factory.get());
+        sessions.put(key, created);
+        evictLeastRecentlyUsed(key, accountId);
+        return created;
+    }
+
+    /**
+     * First the account's own sessions above its limit, then any sessions above the global limit; oldest use first,
+     * skipping the new session and busy ones. O(sessions) per new session, which is fine for a bounded store.
+     */
+    private void evictLeastRecentlyUsed(Key created, String accountId) {
+        long ofAccount = sessions.keySet().stream().filter(k -> k.accountId().equals(accountId)).count();
+        Iterator<Map.Entry<Key, Session>> eldestFirst = sessions.entrySet().iterator();
+        while ((ofAccount > maxSessionsPerAccount || sessions.size() > maxSessions) && eldestFirst.hasNext()) {
+            Map.Entry<Key, Session> entry = eldestFirst.next();
+            boolean sameAccount = entry.getKey().accountId().equals(accountId);
+            // Above only the account's limit, only that account's sessions may go.
+            boolean mayGo = sessions.size() > maxSessions || sameAccount;
+            if (mayGo && !entry.getKey().equals(created) && !entry.getValue().lock().isLocked()) {
+                eldestFirst.remove();
+                if (sameAccount) {
+                    ofAccount--;
+                }
+            }
+        }
     }
 
     public synchronized Optional<Session> find(String accountId, String sessionId) {
