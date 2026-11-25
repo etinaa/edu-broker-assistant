@@ -4,11 +4,12 @@ import ai.lab.broker.broker.BrokerService;
 import ai.lab.broker.domain.Account;
 import ai.lab.broker.domain.OrderDecision;
 import ai.lab.broker.domain.OrderSide;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -23,11 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Full application context with the real BrokerService / OrderBook / AccountRepository.
  * Demo data: BRK-1 cash 10000.00, TRNC=20; BRK-2 cash 100.00, SMPL=10.
- * The context is recreated for every test method so tests do not share state.
+ * The context is shared; {@link DemoState} resets the in-memory state before each test.
  */
 @SpringBootTest(properties = "llm.provider=ollama")
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class OrderControllerIntegrationTest {
 
     private static final String HEADER = "X-Account-Id";
@@ -37,6 +37,14 @@ class OrderControllerIntegrationTest {
 
     @Autowired
     private BrokerService broker;
+
+    @Autowired
+    private ApplicationContext context;
+
+    @BeforeEach
+    void setUp() {
+        DemoState.reset(context);
+    }
 
     private String place(String accountId, OrderSide side, String ticker, long qty) {
         OrderDecision d = broker.placeOrder(accountId, side, ticker, qty);

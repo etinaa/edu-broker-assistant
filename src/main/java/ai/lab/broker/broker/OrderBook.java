@@ -32,4 +32,10 @@ public class OrderBook {
     public void add(Order order) {
         orders.put(order.getId(), order);
     }
+
+    /** Removes all orders and restarts ids from ORD-1; lets tests share one Spring context. */
+    public void clear() {
+        orders.clear();
+        sequence.set(0);
+    }
 }

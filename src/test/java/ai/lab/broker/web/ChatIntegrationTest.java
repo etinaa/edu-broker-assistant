@@ -12,12 +12,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -38,11 +38,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Task 8: /chat end to end on the full context — real tools, broker and sessions, a scripted model instead of
  * a provider. Fast feedback before runs on a real model. Demo data: BRK-1 cash 10000.00, TRNC=20;
- * BRK-2 cash 100.00, SMPL=10. The context is recreated per test, so accounts and orders start clean.
+ * BRK-2 cash 100.00, SMPL=10. The context is shared; {@link DemoState} resets accounts, orders, sessions and
+ * traces before each test.
  */
 @SpringBootTest(properties = {"llm.provider=ollama", "agent.max-steps=4"})
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ChatIntegrationTest {
 
     private static final String HEADER = "X-Account-Id";
@@ -69,8 +69,12 @@ class ChatIntegrationTest {
     @Autowired
     private BrokerService broker;
 
+    @Autowired
+    private ApplicationContext context;
+
     @BeforeEach
     void setUp() {
+        DemoState.reset(context);
         model.reset();
     }
 

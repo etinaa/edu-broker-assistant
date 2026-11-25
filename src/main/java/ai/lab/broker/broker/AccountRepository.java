@@ -15,11 +15,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Component
 public class AccountRepository {
 
-    private final List<Account> accounts;
+    private final List<Account> accounts = new CopyOnWriteArrayList<>();
 
     public AccountRepository() {
-        accounts = new CopyOnWriteArrayList<>();
+        seedDemoAccounts();
+    }
 
+    /** Back to the demo accounts as on startup; lets tests share one Spring context instead of recreating it. */
+    public void reset() {
+        accounts.clear();
+        seedDemoAccounts();
+    }
+
+    private void seedDemoAccounts() {
         Account account1 = new Account("BRK-1", new BigDecimal("10000.00"),
                 Map.of("TRNC", 20L, "SMPB", 100L, "DEMO", 5L)
         );
