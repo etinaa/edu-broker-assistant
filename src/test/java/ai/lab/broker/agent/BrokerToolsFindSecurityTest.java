@@ -50,6 +50,12 @@ class BrokerToolsFindSecurityTest {
 
         assertEquals("CANDIDATES", body.get("match").asText());
         assertEquals(3, body.get("securities").size());
+        assertEquals(AmbiguityGuard.ASK_FIRST, body.get("nextStep").asText());
+    }
+
+    @Test
+    void exactMatchHasNoNextStep() throws Exception {
+        assertFalse(MAPPER.readTree(find("TRNC").content()).has("nextStep"));
     }
 
     @Test

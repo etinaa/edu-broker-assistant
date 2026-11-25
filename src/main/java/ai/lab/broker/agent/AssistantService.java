@@ -79,7 +79,8 @@ public class AssistantService {
      *       {@link GroundedExecutor}: a ticker must appear in the user's messages or the successful tool results of
      *       this session (as far as the history still holds them), otherwise the call is rejected without running.
      *       The whole session counts, not just this message: "buy 100 Sample" → candidates → "Logistics" places
-     *       SMPL, which came from the previous message's find_security.</li>
+     *       SMPL, which came from the previous message's find_security. An {@link AmbiguityGuard} then refuses
+     *       other tools after find_security returned CANDIDATES, so the model asks instead of picking one.</li>
      *   <li>When the step limit is reached, the answer is an honest "could not finish", not a fragment of the
      *       model's text.</li>
      *   <li>pendingOrder and candidates are built from this message's tool results, not from the model's text.</li>
@@ -99,11 +100,12 @@ public class AssistantService {
             List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
             try {
-                ToolLoop.Result result = runLoop(conversation, new GroundedExecutor(conversation.seen(), call -> {
-                    ToolResult toolResult = tools.execute(accountId, call);
-                    executed.add(toolResult);
-                    return toolResult;
-                }));
+                ToolLoop.Result result = runLoop(conversation, new GroundedExecutor(conversation.seen(),
+                        new AmbiguityGuard(call -> {
+                            ToolResult toolResult = tools.execute(accountId, call);
+                            executed.add(toolResult);
+                            return toolResult;
+                        })));
                 // Built inside the try: until the response exists, the user has seen nothing of this message.
                 return respond(accountId, sessionId, message, conversation.name(), result);
             } catch (RuntimeException e) {

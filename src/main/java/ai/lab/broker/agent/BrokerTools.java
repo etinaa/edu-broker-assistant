@@ -182,6 +182,10 @@ public class BrokerTools {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("match", result.match());
         view.put("securities", securities);
+        if (result.match() == SearchResult.Match.CANDIDATES) {
+            // Right where the model decides what to do next: a local model skipped this rule in the description.
+            view.put("nextStep", AmbiguityGuard.ASK_FIRST);
+        }
         return ToolResult.ok(call, toJson(view));
     }
 

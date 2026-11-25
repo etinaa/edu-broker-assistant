@@ -132,6 +132,22 @@ class ChatIntegrationTest {
     }
 
     @Test
+    void afterCandidatesTheModelCannotGoOnWithAnotherToolAndMustAsk() throws Exception {
+        // Question 4 as the local model played it: candidates, then the account summary to answer about TRNC.
+        model.callsTool("find_security", "{\"query\":\"Training\"}")
+                .callsTool("get_account_summary", "{}")
+                .answers("Which one: TRNC, TRNP or TREN?");
+
+        chat("BRK-1", "s1", "how many Training do I have?")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates.length()").value(3));
+
+        var summary = model.lastConversation().toolResults().get(1);
+        assertTrue(summary.error());
+        assertFalse(summary.content().contains("\"cash\""));
+    }
+
+    @Test
     void refusalIsAnOrdinaryAnswerWithoutPendingOrder() throws Exception {
         model.callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":1}")
                 .answers("Not enough cash: short by 85.25 USD");
