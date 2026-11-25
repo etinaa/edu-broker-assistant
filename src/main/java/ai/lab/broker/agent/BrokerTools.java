@@ -44,7 +44,7 @@ public class BrokerTools {
     static final String GET_ACCOUNT_SUMMARY = """
             {
               "name": "get_account_summary",
-              "description": "The client's account state: cash in USD and all positions (ticker, security name, quantity). Use it for questions like 'what is in my account', 'how much cash do I have', 'how many X do I have'.",
+              "description": "The client's account state: cash in USD and all positions (ticker, security name, quantity). Use it for questions like 'what is in my account', 'how much cash do I have', 'how many TRNC do I have'. If the user names a security by name rather than an exact ticker or ISIN, call find_security first: a name may match several securities, and the account holds only some of them.",
               "input_schema": {"type": "object", "properties": {}}
             }
             """;
@@ -52,7 +52,7 @@ public class BrokerTools {
     static final String FIND_SECURITY = """
             {
               "name": "find_security",
-              "description": "Find a security by ticker, ISIN or part of its name. Returns match: EXACT — the security is identified unambiguously; CANDIDATES — several securities match: show the user the options (ticker and name) and ask them to choose, do not choose yourself; NOT_FOUND — no security found, do not make up a ticker. Call it before any action with a security if the user did not give an exact ticker.",
+              "description": "Find a security by ticker, ISIN or part of its name. Returns match: EXACT — the security is identified unambiguously; CANDIDATES — several securities match: show the user the options (ticker and name) and ask them to choose, do not choose yourself; NOT_FOUND — no security found, do not make up a ticker. Call it before any action with a security, and before answering any question about one (price, how many the user holds), if the user did not give an exact ticker or ISIN.",
               "input_schema": {
                 "type": "object",
                 "properties": {
