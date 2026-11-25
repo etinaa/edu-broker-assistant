@@ -11,7 +11,9 @@ fixes guessing more reliably: the tool description, the system prompt or the cod
 
 The tool description and the prompt are enough for a strong model (Claude) but not always for a local one. The
 code works reliably: on `CANDIDATES`, `find_security` returns a `nextStep`, and `AmbiguityGuard` refuses other
-tools until a search returns `EXACT`. Then the only thing the model can do is ask the user.
+tools until a search returns `EXACT`. Then the only thing the model can do is ask the user. That `EXACT` unblocks
+only the reading tools: `place_order` stays refused until the user's next message, because a narrower search the
+model makes itself ("Training" → "TRNC") is still its own choice, not the user's.
 
 ## Setup
 
@@ -65,3 +67,8 @@ but only once it has searched. Whether it searches at all is decided by the tool
 answered "20 TRNC" on question 4 without a search. A description is not a guarantee: if another model skips the
 search again, the next step is in code, an optional `query` parameter of `get_account_summary` that goes through
 the same search.
+
+The guard also keeps orders out of the message that got the candidates. An earlier version let a narrower `EXACT`
+search unblock `place_order` too, so for "Buy 10 Training" the model could search for "TRNC" itself and place the
+order without asking (the order still waited for `/confirm`). Now that search unblocks only the reading tools. The
+results above are not affected: questions 1–4 place no orders.

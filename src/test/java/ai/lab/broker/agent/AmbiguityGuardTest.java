@@ -24,7 +24,10 @@ class AmbiguityGuardTest {
 
     private final List<String> executed = new ArrayList<>();
 
-    /** find_security answers by query: "Training" → CANDIDATES, "TRNC" → EXACT, anything else → NOT_FOUND. */
+    /**
+     * find_security answers by query: "Training" → CANDIDATES, "TRNC" and "DEMO" → EXACT, "DEMA" → NOT_FOUND with
+     * suggestions, anything else → NOT_FOUND.
+     */
     private final AmbiguityGuard guard = new AmbiguityGuard(call -> {
         executed.add(call.name());
         String query = call.arguments().path("query").asText();
@@ -49,8 +52,27 @@ class AmbiguityGuardTest {
     }
 
     @Test
-    void aNarrowerSearchWithExactMatchLiftsTheBlock() throws Exception {
+    void aNarrowerSearchWithExactMatchLiftsTheBlockForReadingTools() throws Exception {
         apply("find_security", "{\"query\":\"Training\"}");
+        apply("find_security", "{\"query\":\"TRNC\"}");
+
+        assertFalse(apply("get_quote", "{\"ticker\":\"TRNC\"}").error());
+    }
+
+    @Test
+    void afterCandidatesNoOrderInThisMessageEvenIfTheModelNarrowsTheSearchItself() throws Exception {
+        apply("find_security", "{\"query\":\"Training\"}");
+        apply("find_security", "{\"query\":\"TRNC\"}");
+
+        ToolResult order = apply("place_order", "{\"ticker\":\"TRNC\"}");
+
+        assertTrue(order.error());
+        assertEquals(AmbiguityGuard.NO_ORDER_ON_A_CANDIDATE, order.content());
+        assertFalse(executed.contains("place_order"));
+    }
+
+    @Test
+    void anExactSearchWithoutEarlierCandidatesAllowsAnOrder() throws Exception {
         apply("find_security", "{\"query\":\"TRNC\"}");
 
         assertFalse(apply("place_order", "{\"ticker\":\"TRNC\"}").error());
