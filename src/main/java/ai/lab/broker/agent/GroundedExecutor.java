@@ -1,9 +1,12 @@
 package ai.lab.broker.agent;
 
+import ai.lab.broker.llm.ToolConversation.Seen;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 
 import java.util.List;
@@ -14,20 +17,27 @@ import java.util.regex.Pattern;
  * Checks arguments against what the model has actually seen (from lesson 1.4, task 5). A ticker in the arguments
  * must appear in the user's messages or in successful tool results, otherwise the model "corrected" or made it up.
  * <p>
- * Task 7: {@link AssistantService} creates one per message, seeded with {@code ToolConversation.groundingText()},
- * i.e. the whole session history. The instance then adds the results of its own calls as they come.
+ * Task 7: {@link AssistantService} creates one per message, seeded with {@code ToolConversation.seen()}, i.e. the
+ * whole session history. The instance then adds the results of its own calls as they come.
+ * <p>
+ * The user's messages count as typed. From tool results only the values of {@code ticker} fields count: keys and
+ * constants ({@code ticker}, {@code USD}, {@code EXACT}) and free text such as a refusal message that repeats the
+ * requested ticker are not identifiers the model may use.
  */
 public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
 
     /** Only identifiers are checked: the model must not derive them. */
     private static final List<String> IDENTIFIER_ARGUMENTS = List.of("ticker");
 
-    private final Function<ToolCall, ToolResult> delegate;
-    private final StringBuilder seenText;
+    private static final ObjectMapper JSON = new ObjectMapper();
 
-    public GroundedExecutor(String seenSoFar, Function<ToolCall, ToolResult> delegate) {
+    private final Function<ToolCall, ToolResult> delegate;
+    private final StringBuilder seenText = new StringBuilder();
+
+    public GroundedExecutor(Seen seenSoFar, Function<ToolCall, ToolResult> delegate) {
         this.delegate = delegate;
-        this.seenText = new StringBuilder(seenSoFar);
+        seenSoFar.userMessages().forEach(message -> seenText.append(message).append('\n'));
+        seenSoFar.toolResults().forEach(this::addTickersOf);
     }
 
     @Override
@@ -45,9 +55,22 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         }
         ToolResult result = delegate.apply(call);
         if (!result.error()) {
-            seenText.append('\n').append(result.content());
+            addTickersOf(result.content());
         }
         return result;
+    }
+
+    /** Values of every ticker field, at any depth; a result that is not JSON adds nothing. */
+    private void addTickersOf(String toolResult) {
+        try {
+            for (JsonNode ticker : JSON.readTree(toolResult).findValues("ticker")) {
+                if (ticker.isTextual()) {
+                    seenText.append(ticker.asText()).append('\n');
+                }
+            }
+        } catch (JsonProcessingException e) {
+            // Not JSON: free text is not a source of identifiers.
+        }
     }
 
     /** As a whole token, ignoring case: trnc → TRNC is an allowed normalization, TRN → TRNC is not. */

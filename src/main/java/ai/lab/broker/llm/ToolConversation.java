@@ -33,6 +33,9 @@ public interface ToolConversation {
         }
     }
 
+    /** What the model was given and may rely on: user messages as typed, tool results as returned (JSON). */
+    record Seen(List<String> userMessages, List<String> toolResults) {}
+
     /** The model's reply on one step: empty calls means the model answered with text and the loop is done. */
     record Turn(List<ToolCall> calls, LlmResponse response) {}
 
@@ -46,11 +49,10 @@ public interface ToolConversation {
     void addToolResults(List<ToolResult> results);
 
     /**
-     * The user's messages and the successful tool results still in the history, as text: identifiers the model passes
-     * to tools must come from here ({@code GroundedExecutor}). The model's own replies and error results are not
-     * included.
+     * The user's messages and the successful tool results still in the history: identifiers the model passes to tools
+     * must come from here ({@code GroundedExecutor}). The model's own replies and error results are not included.
      */
-    String groundingText();
+    Seen seen();
 
     /** Number of messages in the history; useful for the session history limit. */
     int size();

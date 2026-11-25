@@ -91,7 +91,7 @@ class HistoryTest {
     }
 
     @Test
-    void claudeGroundingTextHasUserTextAndSuccessfulResultsOnly() throws Exception {
+    void claudeSeenHasUserTextAndSuccessfulResultsOnly() throws Exception {
         ArrayNode messages = messages("""
                 [
                   {"role":"user","content":"buy Tesla"},
@@ -102,15 +102,14 @@ class HistoryTest {
                     {"type":"tool_result","tool_use_id":"t2","content":"{\\"ticker\\":\\"SMPL\\"}"}]}
                 ]""");
 
-        String text = History.groundingText(messages);
+        ToolConversation.Seen seen = History.seen(messages);
 
-        assertTrue(text.contains("buy Tesla"));
-        assertTrue(text.contains("SMPL"));
-        assertFalse(text.contains("TSLA"));
+        assertEquals(List.of("buy Tesla"), seen.userMessages());
+        assertEquals(List.of("{\"ticker\":\"SMPL\"}"), seen.toolResults());
     }
 
     @Test
-    void ollamaGroundingTextSkipsAssistantAndErrorResults() throws Exception {
+    void ollamaSeenSkipsAssistantAndErrorResults() throws Exception {
         ArrayNode messages = messages("""
                 [
                   {"role":"user","content":"buy Tesla"},
@@ -119,11 +118,10 @@ class HistoryTest {
                   {"role":"tool","tool_name":"find_security","content":"{\\"ticker\\":\\"SMPL\\"}"}
                 ]""");
 
-        String text = History.groundingText(messages);
+        ToolConversation.Seen seen = History.seen(messages);
 
-        assertTrue(text.contains("buy Tesla"));
-        assertTrue(text.contains("SMPL"));
-        assertFalse(text.contains("TSLA"));
+        assertEquals(List.of("buy Tesla"), seen.userMessages());
+        assertEquals(List.of("{\"ticker\":\"SMPL\"}"), seen.toolResults());
     }
 
     @Test

@@ -225,11 +225,9 @@ class AssistantServiceTest {
         }
 
         @Override
-        public String groundingText() {
-            StringBuilder text = new StringBuilder(String.join("\n", userMessages));
-            toolResults.stream().filter(result -> !result.error())
-                    .forEach(result -> text.append('\n').append(result.content()));
-            return text.toString();
+        public Seen seen() {
+            return new Seen(List.copyOf(userMessages),
+                    toolResults.stream().filter(result -> !result.error()).map(ToolResult::content).toList());
         }
 
         @Override

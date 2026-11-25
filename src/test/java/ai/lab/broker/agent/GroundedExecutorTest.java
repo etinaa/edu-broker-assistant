@@ -1,5 +1,6 @@
 package ai.lab.broker.agent;
 
+import ai.lab.broker.llm.ToolConversation.Seen;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
@@ -18,7 +19,12 @@ class GroundedExecutorTest {
 
     private final List<ToolCall> executed = new ArrayList<>();
 
-    private GroundedExecutor executor(String seen, String resultContent) {
+    /** userMessage — what the user typed earlier in the session; resultContent — what the tool will return. */
+    private GroundedExecutor executor(String userMessage, String resultContent) {
+        return executor(new Seen(List.of(userMessage), List.of()), resultContent);
+    }
+
+    private GroundedExecutor executor(Seen seen, String resultContent) {
         return new GroundedExecutor(seen, call -> {
             executed.add(call);
             return ToolResult.ok(call, resultContent);
@@ -64,7 +70,7 @@ class GroundedExecutorTest {
 
     @Test
     void tickerIsCheckedWithoutSurroundingSpacesAsTheToolWouldUseIt() throws Exception {
-        String seen = "{\"securities\":[{\"ticker\":\"TRNC\"}]}";
+        Seen seen = new Seen(List.of(), List.of("{\"securities\":[{\"ticker\":\"TRNC\"}]}"));
 
         assertFalse(executor(seen, "{}").apply(call("get_quote", "{\"ticker\":\" TRNC \"}")).error());
         assertTrue(executor(seen, "{}").apply(call("get_quote", "{\"ticker\":\" TRN \"}")).error());
@@ -77,6 +83,44 @@ class GroundedExecutorTest {
 
         assertEquals("missing ticker", result.content());
         assertEquals(1, executed.size());
+    }
+
+    @Test
+    void tickerFromAnEarlierMessagesResultIsSeen() throws Exception {
+        Seen seen = new Seen(List.of("buy 100 Sample", "Logistics"),
+                List.of("{\"match\":\"CANDIDATES\",\"securities\":[{\"ticker\":\"SMPB\"},{\"ticker\":\"SMPL\"}]}"));
+
+        assertFalse(executor(seen, "{}").apply(call("place_order", "{\"ticker\":\"SMPL\"}")).error());
+    }
+
+    @Test
+    void jsonKeysAndConstantsOfResultsAreNotIdentifiers() throws Exception {
+        Seen seen = new Seen(List.of("how much is Sample Logistics?"),
+                List.of("{\"match\":\"EXACT\",\"securities\":[{\"ticker\":\"SMPL\"}]}",
+                        "{\"ticker\":\"SMPL\",\"price\":12.30,\"currency\":\"USD\"}"));
+
+        for (String notATicker : List.of("USD", "EXACT", "ticker", "price")) {
+            assertTrue(executor(seen, "{}").apply(call("get_quote", "{\"ticker\":\"" + notATicker + "\"}")).error(),
+                    notATicker);
+        }
+    }
+
+    @Test
+    void tickerRepeatedInARefusalMessageIsNotSeen() throws Exception {
+        GroundedExecutor executor = executor("buy 2 trnx", "{\"result\":\"REFUSED\",\"message\":\"Security TRNY not found\"}");
+
+        executor.apply(call("place_order", "{\"ticker\":\"TRNX\"}"));
+
+        assertTrue(executor.apply(call("place_order", "{\"ticker\":\"TRNY\"}")).error());
+    }
+
+    @Test
+    void resultThatIsNotJsonAddsNothing() throws Exception {
+        GroundedExecutor executor = executor("hi", "TRNC is a nice stock");
+
+        executor.apply(call("get_account_summary", "{}"));
+
+        assertTrue(executor.apply(call("get_quote", "{\"ticker\":\"TRNC\"}")).error());
     }
 
     @Test

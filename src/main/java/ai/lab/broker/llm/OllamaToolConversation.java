@@ -75,8 +75,8 @@ public final class OllamaToolConversation implements ToolConversation {
     }
 
     @Override
-    public String groundingText() {
-        return History.groundingText(messages);
+    public Seen seen() {
+        return History.seen(messages);
     }
 
     @Override

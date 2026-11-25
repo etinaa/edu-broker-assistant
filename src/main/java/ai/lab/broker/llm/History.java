@@ -3,6 +3,9 @@ package ai.lab.broker.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * History trimming shared by the providers. An exchange starts with a user message whose content is plain text
  * (Claude's tool_result messages also have role user, but their content is an array of blocks; Ollama's results
@@ -46,28 +49,29 @@ final class History {
     }
 
     /**
-     * User messages and successful tool results, one per line: what the model may take identifiers from. The model's
+     * User messages and successful tool results in the history: what the model may take identifiers from. The model's
      * own text is left out (it could name a ticker it made up), and so are error results (they may echo the bad value).
      * Claude marks errors with is_error; Ollama results start with {@link #OLLAMA_ERROR_PREFIX}.
      */
-    static String groundingText(ArrayNode messages) {
-        StringBuilder text = new StringBuilder();
+    static ToolConversation.Seen seen(ArrayNode messages) {
+        List<String> userMessages = new ArrayList<>();
+        List<String> toolResults = new ArrayList<>();
         for (JsonNode message : messages) {
             String role = message.path("role").asText();
             JsonNode content = message.path("content");
             if ("user".equals(role) && content.isTextual()) {
-                text.append(content.asText()).append('\n');
+                userMessages.add(content.asText());
             } else if ("user".equals(role) && content.isArray()) {
                 for (JsonNode block : content) {
                     if ("tool_result".equals(block.path("type").asText()) && !block.path("is_error").asBoolean()) {
-                        text.append(block.path("content").asText()).append('\n');
+                        toolResults.add(block.path("content").asText());
                     }
                 }
             } else if ("tool".equals(role) && !content.asText().startsWith(OLLAMA_ERROR_PREFIX)) {
-                text.append(content.asText()).append('\n');
+                toolResults.add(content.asText());
             }
         }
-        return text.toString();
+        return new ToolConversation.Seen(userMessages, toolResults);
     }
 
     private static boolean startsExchange(JsonNode message) {

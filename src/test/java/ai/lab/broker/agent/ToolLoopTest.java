@@ -66,8 +66,8 @@ class ToolLoopTest {
         }
 
         @Override
-        public String groundingText() {
-            return "";
+        public Seen seen() {
+            return new Seen(List.of(), List.of());
         }
 
         @Override

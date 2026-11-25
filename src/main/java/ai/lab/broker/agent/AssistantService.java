@@ -93,7 +93,7 @@ public class AssistantService {
             List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
             try {
-                result = runLoop(conversation, new GroundedExecutor(conversation.groundingText(), call -> {
+                result = runLoop(conversation, new GroundedExecutor(conversation.seen(), call -> {
                     ToolResult toolResult = tools.execute(accountId, call);
                     executed.add(toolResult);
                     return toolResult;
