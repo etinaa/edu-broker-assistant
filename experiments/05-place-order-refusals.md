@@ -52,8 +52,8 @@ spaces and commas are removed from the text before the search (4,100.00 → 4100
 
 | | Correct | Steps | Per dialogue | HTTP |
 |---|---|---|---|---|
-| claude-haiku-4-5 | 6/6 | 2.2 | $0.0046 | ~2.7 s |
-| ollama/qwen3.5:9b | 6/6 | 2.8 | free | ~22.2 s |
+| claude-haiku-4-5 | 6/6 | 2.2 | $0.0047 | ~2.7 s |
+| ollama/qwen3.5:9b | 6/6 | 3.0 | free | ~24.5 s |
 
 - **Numbers:** 0 mismatches. Every number the code computed (price, total, cash after, needed, available,
   shortfall) appears in the model's text, on both models.
@@ -64,3 +64,7 @@ spaces and commas are removed from the text before the search (4,100.00 → 4100
   got the code's `INVALID_QUANTITY` refusal.
 - **Question 9:** Ollama searched twice ("Tesla", "TSLA") and read the account before saying it is not available;
   Claude searched once.
+- **Questions 5 and 10:** Ollama called `find_security("DEMO")` before `place_order`, although DEMO is an exact
+  ticker; Claude went straight to `place_order`. This is the extra step in Ollama's average.
+- **Confirmation wording:** both models tell the user to confirm the order "separately" or "outside this chat",
+  as the system prompt now says (commit `561d651`); the earlier runs repeated "the Confirm button in the UI".
