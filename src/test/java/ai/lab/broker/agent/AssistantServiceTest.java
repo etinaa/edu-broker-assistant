@@ -43,11 +43,12 @@ class AssistantServiceTest {
     @BeforeEach
     void setUp() {
         broker = new BrokerService(new SecurityCatalog(), new AccountRepository(), new OrderBook());
-        traces = new TraceStore();
+        traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100));
         service = new AssistantService((system, tools) -> {
             created++;
             return new ScriptedConversation();
-        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40)), traces, new AgentProperties(3, 0.0, 40));
+        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40, 100, 100)), traces,
+                new AgentProperties(3, 0.0, 40, 100, 100));
     }
 
     private static LlmResponse response(String text) {

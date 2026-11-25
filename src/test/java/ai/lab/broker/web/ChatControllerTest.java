@@ -76,4 +76,29 @@ class ChatControllerTest {
 
         verify(assistant).resetSession("BRK-1", "s1");
     }
+
+    @Test
+    void tooLongOrUnusualSessionIdIs400AndModelIsNotCalled() throws Exception {
+        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+
+        for (String sessionId : new String[]{"x".repeat(65), "has space", "../etc", "s\\n1"}) {
+            String body = "{\"sessionId\":\"" + sessionId + "\",\"message\":\"hi\"}";
+            mvc.perform(post("/chat").header("X-Account-Id", "BRK-1")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(assistant, never()).chat(any(), any(), any());
+    }
+
+    @Test
+    void sessionIdOfLettersDigitsDashAndUnderscoreIsAccepted() throws Exception {
+        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(assistant.chat("BRK-1", "web_Tab-1", "hi"))
+                .thenReturn(new ChatResponse("ok", null, List.of(), false, "t1"));
+
+        mvc.perform(post("/chat").header("X-Account-Id", "BRK-1").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sessionId\":\"web_Tab-1\",\"message\":\"hi\"}"))
+                .andExpect(status().isOk());
+    }
 }

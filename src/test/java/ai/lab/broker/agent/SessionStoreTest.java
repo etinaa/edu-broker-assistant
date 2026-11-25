@@ -15,7 +15,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SessionStoreTest {
 
     private static SessionStore store(int maxHistoryMessages) {
-        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages));
+        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages, 100, 100));
+    }
+
+    private static SessionStore storeWithMaxSessions(int maxSessions) {
+        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, 100));
     }
 
     @Test
@@ -45,6 +49,25 @@ class SessionStoreTest {
     @Test
     void limitMustBePositive() {
         assertThrows(IllegalArgumentException.class, () -> store(0));
+    }
+
+    @Test
+    void leastRecentlyUsedSessionIsEvicted() {
+        SessionStore store = storeWithMaxSessions(2);
+        ToolConversation first = store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1));
+        store.getOrCreate("BRK-1", "b", () -> new FakeConversation(1));
+        store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1)); // "a" is used again, "b" is now eldest
+        store.getOrCreate("BRK-1", "c", () -> new FakeConversation(1));
+
+        assertEquals(2, store.size());
+        assertSame(first, store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1)));
+        ToolConversation fresh = new FakeConversation(1);
+        assertSame(fresh, store.getOrCreate("BRK-1", "b", () -> fresh));
+    }
+
+    @Test
+    void maxSessionsMustBePositive() {
+        assertThrows(IllegalArgumentException.class, () -> storeWithMaxSessions(0));
     }
 
     @Test

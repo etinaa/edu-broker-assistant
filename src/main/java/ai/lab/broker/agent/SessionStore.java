@@ -5,8 +5,8 @@ import ai.lab.broker.llm.ToolConversation;
 
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -18,24 +18,45 @@ import java.util.function.Supplier;
  * the oldest exchanges are dropped whole (a user message with its tool calls and results), so the request keeps
  * fitting the context window. The latest exchange is never dropped. Older context is lost, but nothing that matters
  * for money: orders live in the order book, and numbers come from the tools again.
+ * <p>
+ * The number of sessions is bounded by {@code agent.max-sessions}: the least recently used session is evicted when
+ * a new one does not fit. sessionId is chosen by the client, so without the bound every new id would stay in memory
+ * forever. An evicted session simply starts over with an empty history.
  */
 @Component
 public class SessionStore {
 
     private record Key(String accountId, String sessionId) {}
 
-    private final Map<Key, ToolConversation> sessions = new ConcurrentHashMap<>();
+    /** Access order: get() moves a session to the end, so the eldest entry is the least recently used. */
+    private final Map<Key, ToolConversation> sessions;
     private final int maxHistoryMessages;
 
     public SessionStore(AgentProperties agent) {
         if (agent.maxHistoryMessages() <= 0) {
             throw new IllegalArgumentException("agent.max-history-messages must be positive");
         }
+        if (agent.maxSessions() <= 0) {
+            throw new IllegalArgumentException("agent.max-sessions must be positive");
+        }
         this.maxHistoryMessages = agent.maxHistoryMessages();
+        int maxSessions = agent.maxSessions();
+        this.sessions = new LinkedHashMap<>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<Key, ToolConversation> eldest) {
+                return size() > maxSessions;
+            }
+        };
     }
 
-    public ToolConversation getOrCreate(String accountId, String sessionId, Supplier<ToolConversation> factory) {
+    /** The factory only builds an object (no network call), so holding the store's lock while it runs is cheap. */
+    public synchronized ToolConversation getOrCreate(String accountId, String sessionId,
+                                                     Supplier<ToolConversation> factory) {
         return sessions.computeIfAbsent(new Key(accountId, sessionId), key -> factory.get());
+    }
+
+    public synchronized int size() {
+        return sessions.size();
     }
 
     /**
@@ -52,11 +73,11 @@ public class SessionStore {
         return dropped;
     }
 
-    public void remove(String accountId, String sessionId) {
+    public synchronized void remove(String accountId, String sessionId) {
         sessions.remove(new Key(accountId, sessionId));
     }
 
-    public void clear() {
+    public synchronized void clear() {
         sessions.clear();
     }
 }

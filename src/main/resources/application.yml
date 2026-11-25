@@ -23,6 +23,9 @@ agent:
   temperature: 0.0
   # Session history limit in messages. Older exchanges are dropped whole; the latest one always stays.
   max-history-messages: 40
+  # Sessions and traces kept in memory; the least recently used session and the oldest trace go first.
+  max-sessions: 1000
+  max-traces: 1000
 
 management:
   endpoints:
