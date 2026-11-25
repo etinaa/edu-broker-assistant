@@ -64,6 +64,10 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.ticker").value("TRNC"))
                 .andExpect(jsonPath("$.quantity").value(2))
+                .andExpect(jsonPath("$.fee").value(0))
+                .andExpect(jsonPath("$.amount").value(370.50))
+                .andExpect(jsonPath("$.total").value(370.50))
+                .andExpect(jsonPath("$.executedTotal").doesNotExist())
                 .andExpect(jsonPath("$.status").value("PENDING_CONFIRMATION"));
     }
 

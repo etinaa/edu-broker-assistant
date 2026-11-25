@@ -54,10 +54,12 @@ public sealed interface OrderDecision {
             return new Refused(Reason.UNKNOWN_SECURITY, "Security with ticker = " + ticker + " not found");
         }
 
-        public static Refused insufficientFunds(BigDecimal needed, BigDecimal available) {
+        /** needed already includes the fee; a non-zero fee is named in the text so the model can explain the total. */
+        public static Refused insufficientFunds(BigDecimal needed, BigDecimal available, BigDecimal fee) {
             BigDecimal shortfall = needed.subtract(available);
+            String feeNote = fee.signum() > 0 ? " (including a fee of " + fee.toPlainString() + " USD)" : "";
             return new Refused(Reason.INSUFFICIENT_FUNDS,
-                    "Insufficient funds: needed " + needed.toPlainString() + " USD, available "
+                    "Insufficient funds: needed " + needed.toPlainString() + " USD" + feeNote + ", available "
                             + available.toPlainString() + " USD, short by " + shortfall.toPlainString() + " USD",
                     needed, available, shortfall);
         }

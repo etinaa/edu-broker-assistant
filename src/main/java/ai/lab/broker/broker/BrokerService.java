@@ -109,7 +109,7 @@ public class BrokerService {
      * <ul>
      *   <li>quantity ≤ 0 → Refused(INVALID_QUANTITY);</li>
      *   <li>unknown ticker → Refused(UNKNOWN_SECURITY);</li>
-     *   <li>BUY: total = price × quantity; total &gt; cash → Refused(INSUFFICIENT_FUNDS) with the shortfall;</li>
+     *   <li>BUY: total = price × quantity + fee; total &gt; cash → Refused(INSUFFICIENT_FUNDS) with the shortfall;</li>
      *   <li>SELL: quantity &gt; position → Refused(INSUFFICIENT_POSITION) with how many are available;</li>
      *   <li>otherwise — Order(PENDING_CONFIRMATION) in the {@link OrderBook} and Created with cashAfter.</li>
      * </ul>
@@ -131,10 +131,10 @@ public class BrokerService {
 
         Account account = optAccount.get();
         Security security = optSecurity.get();
-        BigDecimal total = BigDecimal.valueOf(quantity).multiply(security.currentPrice());
+        TradeCost cost = TradeCost.of(side, quantity, security.currentPrice(), properties::fee);
         if (side == OrderSide.BUY) {
-            if (!account.enoughCash(total)) {
-                return OrderDecision.Refused.insufficientFunds(total, account.getCash());
+            if (!account.enoughCash(cost.total())) {
+                return OrderDecision.Refused.insufficientFunds(cost.total(), account.getCash(), cost.fee());
             }
         }
         if (side == OrderSide.SELL) {
@@ -144,16 +144,17 @@ public class BrokerService {
             }
         }
 
-        Order order = createOrder(accountId, side, security.ticker(), quantity, security.currentPrice());
+        Order order = createOrder(accountId, side, security.ticker(), quantity, security.currentPrice(), cost.fee());
         BigDecimal cashAfter = side == OrderSide.BUY
-                ? account.getCash().subtract(total)
-                : account.getCash().add(total);
+                ? account.getCash().subtract(cost.total())
+                : account.getCash().add(cost.total());
         return new OrderDecision.Created(order.snapshot(), cashAfter);
     }
 
-    private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {
+    private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price,
+                              BigDecimal fee) {
         String orderId = orders.nextId();
-        Order order = new Order(orderId, accountId, side, ticker, quantity, price, Instant.now(clock));
+        Order order = new Order(orderId, accountId, side, ticker, quantity, price, fee, Instant.now(clock));
         orders.add(order);
         orders.evictOldest(properties.maxOrders(), this::isFinished);
         return order;
@@ -166,7 +167,8 @@ public class BrokerService {
 
     /**
      * Task 1 (basic execution) and task 6 (repeated checks). Only for PENDING_CONFIRMATION that has not expired:
-     * check the price move, re-check the cash or the position at the current price; on success update the account,
+     * check the price move, re-check the cash or the position at the current price (the fee is recomputed at that
+     * price, so it may differ from the order's fee); on success update the account,
      * mark the order EXECUTED and return Confirmed; on failure mark it FAILED and return Refused with the reason.
      * A repeated confirm is Refused and does not change the account a second time.
      */
@@ -203,18 +205,20 @@ public class BrokerService {
                     properties.maxPriceMovePercent()));
         }
         long quantity = order.getQuantity();
+        TradeCost cost = TradeCost.of(order.getSide(), quantity, price, properties::fee);
 
         if (order.getSide() == OrderSide.BUY) {
-            if (!account.add(order.getTicker(), quantity, price)) {
-                BigDecimal total = BigDecimal.valueOf(quantity).multiply(price);
-                return failOrder(order, OrderDecision.Refused.insufficientFunds(total, account.getCash()));
+            if (!account.buy(order.getTicker(), quantity, cost.total())) {
+                return failOrder(order,
+                        OrderDecision.Refused.insufficientFunds(cost.total(), account.getCash(), cost.fee()));
             }
-        } else if (!account.subtract(order.getTicker(), quantity, price)) {
+        } else if (!account.sell(order.getTicker(), quantity, cost.total())) {
             return failOrder(order,
                     OrderDecision.Refused.insufficientPosition(quantity, account.quantityByTicker(order.getTicker())));
         }
 
-        order.setStatus(OrderStatus.EXECUTED, "Order confirmed at " + price.toPlainString() + " USD");
+        String feeNote = cost.fee().signum() > 0 ? ", fee " + cost.fee().toPlainString() + " USD" : "";
+        order.execute(price, cost.fee(), "Order confirmed at " + price.toPlainString() + " USD" + feeNote);
         return new OrderDecision.Confirmed(order.snapshot());
     }
 

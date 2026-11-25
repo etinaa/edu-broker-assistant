@@ -18,7 +18,8 @@ public record ChatResponse(String answer, PendingOrder pendingOrder, List<Securi
                            boolean limitReached, String traceId) {
 
     public record PendingOrder(String orderId, OrderSide side, String ticker, long quantity,
-                               BigDecimal price, BigDecimal total, BigDecimal cashAfter, OrderStatus status) {
+                               BigDecimal price, BigDecimal fee, BigDecimal total, BigDecimal cashAfter,
+                               OrderStatus status) {
 
         public static PendingOrder from(OrderDecision.Created created) {
             return from(created.order(), created.cashAfter());
@@ -26,7 +27,7 @@ public record ChatResponse(String answer, PendingOrder pendingOrder, List<Securi
 
         public static PendingOrder from(Order order, BigDecimal cashAfter) {
             return new PendingOrder(order.getId(), order.getSide(), order.getTicker(), order.getQuantity(),
-                    order.getPrice(), order.total(), cashAfter, order.getStatus());
+                    order.getPrice(), order.getFee(), order.total(), cashAfter, order.getStatus());
         }
     }
 }

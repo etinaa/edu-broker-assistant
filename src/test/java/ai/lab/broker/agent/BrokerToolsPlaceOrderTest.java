@@ -47,6 +47,7 @@ class BrokerToolsPlaceOrderTest {
         assertEquals("PENDING_CONFIRMATION", body.get("status").asText());
         assertEquals("TRNC", body.get("ticker").asText());
         assertEquals(2, body.get("quantity").asLong());
+        assertMoney("0.00", body.get("fee"));
         assertMoney("370.50", body.get("total"));
         assertMoney("9629.50", body.get("cashAfter"));
         assertTrue(body.hasNonNull("orderId"));

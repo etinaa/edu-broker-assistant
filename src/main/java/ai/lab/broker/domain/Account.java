@@ -30,7 +30,7 @@ public class Account {
         this.positions.putAll(positions);
     }
 
-    /** A read-only view: positions change only through {@link #add} and {@link #subtract}, with the cash. */
+    /** A read-only view: positions change only through {@link #buy} and {@link #sell}, with the cash. */
     public Map<String, Long> getPositions() {
         return Collections.unmodifiableMap(positions);
     }
@@ -39,41 +39,33 @@ public class Account {
         return positions.getOrDefault(ticker, 0L);
     }
 
-    public boolean add(Security security, long quantity) {
-        return add(security.ticker(), quantity, security.currentPrice());
-    }
-
-    /** Buys: adds the position and pays price × quantity. Returns false and changes nothing if cash is short. */
-    public boolean add(String ticker, long quantity, BigDecimal price) {
-        BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-        if (!enoughCash(totalPrice)) {
+    /**
+     * Buys: adds the position and pays total (amount + fee, from {@link TradeCost}).
+     * Returns false and changes nothing if cash is short.
+     */
+    public boolean buy(String ticker, long quantity, BigDecimal total) {
+        if (!enoughCash(total)) {
             return false;
         }
-
         positions.put(ticker, positions.getOrDefault(ticker, 0L) + quantity);
-        cash = cash.subtract(totalPrice);
+        cash = cash.subtract(total);
         return true;
     }
 
-    public boolean enoughCash(BigDecimal totalPrice) {
-        return totalPrice.compareTo(cash) <= 0;
-    }
-
-    public boolean subtract(Security security, long quantity) {
-        return subtract(security.ticker(), quantity, security.currentPrice());
+    public boolean enoughCash(BigDecimal total) {
+        return total.compareTo(cash) <= 0;
     }
 
     /**
-     * Sells: removes the position and receives price × quantity.
+     * Sells: removes the position and receives total (amount − fee, from {@link TradeCost}).
      * Returns false and changes nothing if the position is short.
      */
-    public boolean subtract(String ticker, long quantity, BigDecimal price) {
+    public boolean sell(String ticker, long quantity, BigDecimal total) {
         if (!enoughQuantity(ticker, quantity)) {
             return false;
         }
         positions.put(ticker, positions.getOrDefault(ticker, 0L) - quantity);
-        BigDecimal fullPrice = price.multiply(BigDecimal.valueOf(quantity));
-        cash = cash.add(fullPrice);
+        cash = cash.add(total);
         return true;
     }
 

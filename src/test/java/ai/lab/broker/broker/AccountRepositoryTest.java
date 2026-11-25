@@ -80,14 +80,14 @@ class AccountRepositoryTest {
 
     @Test
     void accountChangesAreVisibleThroughRepository() {
-        repository.byId("BRK-2").orElseThrow().add("SMPL", 1, new BigDecimal("12.30"));
+        repository.byId("BRK-2").orElseThrow().buy("SMPL", 1, new BigDecimal("12.30"));
 
         assertEquals(11L, repository.byId("BRK-2").orElseThrow().quantityByTicker("SMPL"));
     }
 
     @Test
     void eachRepositoryInstanceHasIndependentState() {
-        repository.byId("BRK-2").orElseThrow().add("SMPL", 1, new BigDecimal("12.30"));
+        repository.byId("BRK-2").orElseThrow().buy("SMPL", 1, new BigDecimal("12.30"));
 
         assertEquals(10L, new AccountRepository().byId("BRK-2").orElseThrow().quantityByTicker("SMPL"));
     }

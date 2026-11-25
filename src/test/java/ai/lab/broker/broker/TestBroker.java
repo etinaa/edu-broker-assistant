@@ -6,10 +6,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 
-/** BrokerService on the demo data with the rules from application.yml: orders live 5 minutes, price move 2%. */
+/** BrokerService on the demo data with the rules from application.yml: orders live 5 minutes, price move 2%, no fee. */
 public final class TestBroker {
 
-    public static final BrokerProperties PROPERTIES = new BrokerProperties(Duration.ofMinutes(5), new BigDecimal("2"), 10_000);
+    public static final BrokerProperties PROPERTIES = new BrokerProperties(Duration.ofMinutes(5), new BigDecimal("2"), 10_000,
+            BigDecimal.ZERO, BigDecimal.ZERO);
 
     private TestBroker() {
     }

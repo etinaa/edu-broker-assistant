@@ -27,7 +27,7 @@ class OrderBookTest {
     }
 
     private static Order order(String id) {
-        return new Order(id, "BRK-1", OrderSide.BUY, "TRNC", 1, new BigDecimal("185.25"), Instant.now());
+        return new Order(id, "BRK-1", OrderSide.BUY, "TRNC", 1, new BigDecimal("185.25"), BigDecimal.ZERO, Instant.now());
     }
 
     @Test

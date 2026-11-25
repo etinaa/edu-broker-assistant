@@ -155,7 +155,7 @@ class BrokerServiceTest {
     @Test
     void finishedAndExpiredOrdersAreEvictedAboveTheLimitButPendingOnesStay() {
         BrokerProperties small = new BrokerProperties(TestBroker.PROPERTIES.orderTtl(),
-                TestBroker.PROPERTIES.maxPriceMovePercent(), 2);
+                TestBroker.PROPERTIES.maxPriceMovePercent(), 2, BigDecimal.ZERO, BigDecimal.ZERO);
         BrokerService bounded = TestBroker.with(catalog, orders, clock, small);
 
         Order rejected = assertInstanceOf(OrderDecision.Created.class,
@@ -558,7 +558,8 @@ class BrokerServiceTest {
 
     @Test
     void confirmFailsWithoutFreeTradeWhenTickerIsUnknown() {
-        Order ghost = new Order("ORD-GHOST", "BRK-1", OrderSide.BUY, "GHOST", 10, new BigDecimal("1.00"), clock.instant());
+        Order ghost = new Order("ORD-GHOST", "BRK-1", OrderSide.BUY, "GHOST", 10, new BigDecimal("1.00"),
+                BigDecimal.ZERO, clock.instant());
         orders.add(ghost);
 
         OrderDecision d = service.confirmOrder("BRK-1", ghost.getId());

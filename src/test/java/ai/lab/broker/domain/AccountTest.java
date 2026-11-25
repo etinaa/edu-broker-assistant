@@ -10,9 +10,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AccountTest {
 
-    private static final Security SBER =
-            new Security("SBER", "RU0009029540", "Sberbank", new BigDecimal("100"));
-
     private Account account;
 
     @BeforeEach
@@ -50,86 +47,68 @@ class AccountTest {
     }
 
     @Test
-    void addBuysPositionAndReducesCash() {
-        assertTrue(account.add("SBER", 3, new BigDecimal("100")));
+    void buyAddsPositionAndPaysTheTotal() {
+        assertTrue(account.buy("SBER", 3, new BigDecimal("300.30")));
 
         assertEquals(3L, account.quantityByTicker("SBER"));
-        assertEquals(0, new BigDecimal("700").compareTo(account.getCash()));
+        assertEquals(0, new BigDecimal("699.70").compareTo(account.getCash()));
     }
 
     @Test
-    void addAccumulatesExistingPosition() {
-        account.add("SBER", 2, new BigDecimal("100"));
-        account.add("SBER", 3, new BigDecimal("100"));
+    void buyAccumulatesExistingPosition() {
+        account.buy("SBER", 2, new BigDecimal("200"));
+        account.buy("SBER", 3, new BigDecimal("300"));
 
         assertEquals(5L, account.quantityByTicker("SBER"));
         assertEquals(0, new BigDecimal("500").compareTo(account.getCash()));
     }
 
     @Test
-    void addWithExactCashSucceeds() {
-        assertTrue(account.add("SBER", 10, new BigDecimal("100")));
+    void buyWithExactCashSucceeds() {
+        assertTrue(account.buy("SBER", 10, new BigDecimal("1000")));
         assertEquals(0, BigDecimal.ZERO.compareTo(account.getCash()));
     }
 
     @Test
-    void addFailsWhenNotEnoughCashAndLeavesStateUntouched() {
-        assertFalse(account.add("SBER", 11, new BigDecimal("100")));
+    void buyFailsWhenNotEnoughCashAndLeavesStateUntouched() {
+        assertFalse(account.buy("SBER", 10, new BigDecimal("1000.01")));
 
         assertEquals(0L, account.quantityByTicker("SBER"));
         assertEquals(new BigDecimal("1000"), account.getCash());
     }
 
     @Test
-    void addWithSecurityUsesCurrentPrice() {
-        assertTrue(account.add(SBER, 4));
+    void sellRemovesPositionAndReceivesTheTotal() {
+        account.buy("SBER", 5, new BigDecimal("500"));
 
-        assertEquals(4L, account.quantityByTicker("SBER"));
-        assertEquals(0, new BigDecimal("600").compareTo(account.getCash()));
-    }
-
-    @Test
-    void subtractSellsPositionAndIncreasesCash() {
-        account.add("SBER", 5, new BigDecimal("100"));
-
-        assertTrue(account.subtract("SBER", 2, new BigDecimal("120")));
+        assertTrue(account.sell("SBER", 2, new BigDecimal("239.76")));
 
         assertEquals(3L, account.quantityByTicker("SBER"));
-        assertEquals(0, new BigDecimal("740").compareTo(account.getCash()));
+        assertEquals(0, new BigDecimal("739.76").compareTo(account.getCash()));
     }
 
     @Test
-    void subtractAllSharesSucceeds() {
-        account.add("SBER", 5, new BigDecimal("100"));
+    void sellAllSharesSucceeds() {
+        account.buy("SBER", 5, new BigDecimal("500"));
 
-        assertTrue(account.subtract("SBER", 5, new BigDecimal("100")));
+        assertTrue(account.sell("SBER", 5, new BigDecimal("500")));
         assertEquals(0L, account.quantityByTicker("SBER"));
     }
 
     @Test
-    void subtractFailsWhenNotEnoughSharesAndLeavesStateUntouched() {
-        account.add("SBER", 2, new BigDecimal("100"));
+    void sellFailsWhenNotEnoughSharesAndLeavesStateUntouched() {
+        account.buy("SBER", 2, new BigDecimal("200"));
 
-        assertFalse(account.subtract("SBER", 3, new BigDecimal("100")));
+        assertFalse(account.sell("SBER", 3, new BigDecimal("300")));
 
         assertEquals(2L, account.quantityByTicker("SBER"));
         assertEquals(0, new BigDecimal("800").compareTo(account.getCash()));
     }
 
     @Test
-    void subtractFailsForUnknownTicker() {
-        assertFalse(account.subtract("GAZP", 1, BigDecimal.TEN));
+    void sellFailsForUnknownTicker() {
+        assertFalse(account.sell("GAZP", 1, BigDecimal.TEN));
         assertEquals(new BigDecimal("1000"), account.getCash());
-    }
-
-    @Test
-    void subtractWithSecurityUsesCurrentPrice() {
-        account.add(SBER, 4);
-
-        assertTrue(account.subtract(SBER, 1));
-
-        assertEquals(3L, account.quantityByTicker("SBER"));
-        assertEquals(0, new BigDecimal("700").compareTo(account.getCash()));
     }
 
     @Test
@@ -141,7 +120,7 @@ class AccountTest {
 
     @Test
     void enoughQuantityReturnsTrueOnlyWhenHeldCoversRequested() {
-        account.add("SBER", 5, BigDecimal.ONE);
+        account.buy("SBER", 5, new BigDecimal("5"));
 
         assertFalse(account.enoughQuantity("SBER", 6));
         assertTrue(account.enoughQuantity("SBER", 5));

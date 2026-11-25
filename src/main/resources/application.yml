@@ -38,6 +38,10 @@ broker:
   max-price-move-percent: 2
   # Orders kept in memory; above it the oldest finished or expired ones are removed. Pending orders are kept.
   max-orders: 10000
+  # Broker fee: fee-percent of price × quantity, at least min-fee USD (never more than the amount). 0 = no fee.
+  # A BUY pays amount + fee, a SELL receives amount − fee; confirm recomputes the fee at the current price.
+  fee-percent: 0
+  min-fee: 0
 
 management:
   endpoints:

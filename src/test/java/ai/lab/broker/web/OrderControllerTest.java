@@ -43,7 +43,8 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        order = new Order("ORD-1", "BRK-1", OrderSide.BUY, "TRNC", 2, new BigDecimal("185.25"), Instant.now());
+        order = new Order("ORD-1", "BRK-1", OrderSide.BUY, "TRNC", 2, new BigDecimal("185.25"), BigDecimal.ZERO,
+                Instant.now());
         when(broker.orderById("ORD-1")).thenReturn(Optional.of(order));
     }
 

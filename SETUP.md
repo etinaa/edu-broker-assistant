@@ -133,6 +133,8 @@ run. What can be tuned:
 | `broker.order-ttl` | `5m` | an order not confirmed within this time becomes `EXPIRED` |
 | `broker.max-price-move-percent` | `2` | how far the price may move against the client before confirm; more is a `PRICE_CHANGED` refusal |
 | `broker.max-orders` | `10000` | orders kept in memory; above it the oldest finished or expired ones are removed, pending ones are kept |
+| `broker.fee-percent` | `0` | broker fee as a percent of price × quantity; a BUY pays amount + fee, a SELL receives amount − fee; `0` — no fee |
+| `broker.min-fee` | `0` | the smallest fee per order, USD; the fee is never more than the amount |
 
 Debugging: `logging.level.llm-payload: DEBUG` prints the raw requests to and responses from the models. They contain the whole conversation and the client's cash and positions, so enable it only locally.
 
