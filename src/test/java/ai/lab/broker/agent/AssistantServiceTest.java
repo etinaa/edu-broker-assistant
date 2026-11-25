@@ -246,6 +246,20 @@ class AssistantServiceTest {
     }
 
     @Test
+    void interruptWhileWaitingForTheSessionIsNotReportedAsBusy() {
+        answers("never sent");
+        Thread.currentThread().interrupt();
+        try {
+            assertThrows(AssistantUnavailableException.class, () -> service.chat("BRK-1", "s1", "hi"));
+            assertThrows(AssistantUnavailableException.class, () -> service.resetSession("BRK-1", "s1"));
+            assertTrue(Thread.currentThread().isInterrupted(), "the interrupt flag is restored");
+        } finally {
+            Thread.interrupted(); // clear it for the next tests
+        }
+        assertTrue(userMessages.isEmpty());
+    }
+
+    @Test
     void negativeSessionBusyTimeoutIsRejectedAtStartup() {
         AgentProperties negative = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofMillis(-1));
 

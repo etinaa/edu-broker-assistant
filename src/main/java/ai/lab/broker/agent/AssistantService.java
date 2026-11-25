@@ -140,8 +140,9 @@ public class AssistantService {
                 throw new SessionBusyException();
             }
         } catch (InterruptedException e) {
+            // Shutdown or a cancelled request, not a busy session: a 409 would make the client retry for nothing.
             Thread.currentThread().interrupt();
-            throw new SessionBusyException();
+            throw new AssistantUnavailableException("The request was interrupted", e);
         }
     }
 
