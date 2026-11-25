@@ -6,6 +6,8 @@ import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 import ai.lab.broker.llm.ToolConversation.Turn;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -14,7 +16,11 @@ import java.util.function.Function;
  * Цикл «пока модель просит вызов — выполняем» (перенесено из урока 1.4). Шаг — один запрос к модели;
  * потолок шагов обязателен, иначе модель может вызывать инструменты бесконечно.
  */
+@Slf4j
 public final class ToolLoop {
+
+    /** What the model sees instead of the exception text, which may hold internal details. */
+    static final String TOOL_FAILED = "Internal error in tool %s. Tell the user the operation failed; do not retry it.";
 
     /** Один шаг цикла: что вернули инструменты (пусто — финальный ответ) и сколько стоил запрос к модели. */
     public record Step(List<ToolResult> results, LlmResponse response) {}
@@ -64,14 +70,15 @@ public final class ToolLoop {
     }
 
     /**
-     * Упавший инструмент не должен ронять цикл и показывать пользователю стек: исключение превращается в
-     * результат-ошибку, и модель решает, что с ним делать.
+     * A failed tool must not break the loop: the exception becomes an error result and the model decides what to
+     * tell the user. The model and the trace get only a generic text; the exception with its details goes to the log.
      */
     private static ToolResult execute(Function<ToolCall, ToolResult> executor, ToolCall call) {
         try {
             return executor.apply(call);
         } catch (RuntimeException e) {
-            return ToolResult.error(call, "Internal error in tool " + call.name() + ": " + e.getMessage());
+            log.error("Tool {} failed on call {}", call.name(), call.id(), e);
+            return ToolResult.error(call, TOOL_FAILED.formatted(call.name()));
         }
     }
 }
