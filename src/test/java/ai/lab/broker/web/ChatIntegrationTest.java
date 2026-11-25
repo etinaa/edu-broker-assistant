@@ -148,6 +148,52 @@ class ChatIntegrationTest {
     }
 
     @Test
+    void aTypoGivesSuggestionsAsCandidatesAndNoOrderOnAGuess() throws Exception {
+        // "Buy 10 DEMA": the model searches, gets DEMO as a suggestion and tries to order it anyway.
+        model.callsTool("find_security", "{\"query\":\"DEMA\"}")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"DEMO\",\"quantity\":10}")
+                .answers("Did you mean DEMO (Demo Software Inc.)?");
+
+        chat("BRK-1", "s1", "Buy 10 DEMA")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates.length()").value(0))
+                .andExpect(jsonPath("$.suggestions.length()").value(1))
+                .andExpect(jsonPath("$.suggestions[0].ticker").value("DEMO"))
+                .andExpect(jsonPath("$.pendingOrder").doesNotExist());
+
+        assertTrue(model.lastConversation().toolResults().get(1).error());
+        assertTrue(broker.orderById("ORD-1").isEmpty());
+    }
+
+    @Test
+    void searchingForTheSuggestedTickerInTheSameMessageStillGivesNoOrder() throws Exception {
+        model.callsTool("find_security", "{\"query\":\"DEMA\"}")
+                .callsTool("find_security", "{\"query\":\"DEMO\"}")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"DEMO\",\"quantity\":10}")
+                .answers("Did you mean DEMO?");
+
+        chat("BRK-1", "s1", "Buy 10 DEMA")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingOrder").doesNotExist());
+
+        var order = model.lastConversation().toolResults().get(2);
+        assertTrue(order.error());
+        assertTrue(broker.orderById("ORD-1").isEmpty());
+    }
+
+    @Test
+    void anEmptySearchAfterCandidatesKeepsTheCandidates() throws Exception {
+        model.callsTool("find_security", "{\"query\":\"Training\"}")
+                .callsTool("find_security", "{\"query\":\"Tesla\"}")
+                .answers("Which one: TRNC, TRNP or TREN?");
+
+        chat("BRK-1", "s1", "how many Training do I have?")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.candidates.length()").value(3))
+                .andExpect(jsonPath("$.suggestions.length()").value(0));
+    }
+
+    @Test
     void refusalIsAnOrdinaryAnswerWithoutPendingOrder() throws Exception {
         model.callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":1}")
                 .answers("Not enough cash: short by 85.25 USD");

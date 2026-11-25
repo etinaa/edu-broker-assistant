@@ -19,6 +19,8 @@ class AmbiguityGuardTest {
     private static final String CANDIDATES = "{\"match\":\"CANDIDATES\",\"securities\":[]}";
     private static final String EXACT = "{\"match\":\"EXACT\",\"securities\":[]}";
     private static final String NOT_FOUND = "{\"match\":\"NOT_FOUND\",\"securities\":[]}";
+    private static final String SUGGESTIONS =
+            "{\"match\":\"NOT_FOUND\",\"securities\":[],\"suggestions\":[{\"ticker\":\"DEMO\"}]}";
 
     private final List<String> executed = new ArrayList<>();
 
@@ -26,7 +28,8 @@ class AmbiguityGuardTest {
     private final AmbiguityGuard guard = new AmbiguityGuard(call -> {
         executed.add(call.name());
         String query = call.arguments().path("query").asText();
-        Map<String, String> search = Map.of("Training", CANDIDATES, "TRNC", EXACT);
+        Map<String, String> search = Map.of("Training", CANDIDATES, "TRNC", EXACT, "DEMA", SUGGESTIONS,
+                "DEMO", EXACT);
         return ToolResult.ok(call, "find_security".equals(call.name()) ? search.getOrDefault(query, NOT_FOUND) : "{}");
     });
 
@@ -59,6 +62,44 @@ class AmbiguityGuardTest {
         apply("find_security", "{\"query\":\"Trainnig\"}");
 
         assertTrue(apply("get_quote", "{\"ticker\":\"TRNC\"}").error());
+    }
+
+    @Test
+    void afterSuggestionsOtherToolsAreRefusedWithoutRunning() throws Exception {
+        apply("find_security", "{\"query\":\"DEMA\"}");
+
+        ToolResult order = apply("place_order", "{\"ticker\":\"DEMO\"}");
+
+        assertTrue(order.error());
+        assertEquals(AmbiguityGuard.CONFIRM_SUGGESTION_FIRST, order.content());
+        assertEquals(List.of("find_security"), executed);
+    }
+
+    @Test
+    void anExactSearchAfterSuggestionsLiftsTheBlock() throws Exception {
+        apply("find_security", "{\"query\":\"DEMA\"}");
+        apply("find_security", "{\"query\":\"DEMO\"}");
+
+        assertFalse(apply("get_quote", "{\"ticker\":\"DEMO\"}").error());
+    }
+
+    @Test
+    void afterSuggestionsNoOrderInThisMessageEvenIfTheModelFindsTheSuggestedTickerItself() throws Exception {
+        apply("find_security", "{\"query\":\"DEMA\"}");
+        apply("find_security", "{\"query\":\"DEMO\"}");
+
+        ToolResult order = apply("place_order", "{\"ticker\":\"DEMO\"}");
+
+        assertTrue(order.error());
+        assertEquals(AmbiguityGuard.NO_ORDER_ON_A_SUGGESTION, order.content());
+        assertFalse(executed.contains("place_order"));
+    }
+
+    @Test
+    void notFoundWithoutSuggestionsBlocksNothing() throws Exception {
+        apply("find_security", "{\"query\":\"Tesla\"}");
+
+        assertFalse(apply("get_account_summary", "{}").error());
     }
 
     @Test

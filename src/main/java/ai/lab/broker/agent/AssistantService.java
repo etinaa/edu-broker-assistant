@@ -3,6 +3,7 @@ package ai.lab.broker.agent;
 import ai.lab.broker.broker.BrokerService;
 import ai.lab.broker.config.AgentProperties;
 import ai.lab.broker.domain.Security;
+import ai.lab.broker.domain.SearchResult.Match;
 import ai.lab.broker.llm.ToolConversation;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
@@ -11,6 +12,7 @@ import ai.lab.broker.web.dto.ChatResponse;
 import ai.lab.broker.web.dto.ChatResponse.PendingOrder;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.MissingNode;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -153,14 +155,18 @@ public class AssistantService {
                 .toList();
         String answer = answerFor(result);
         PendingOrder pendingOrder = pendingOrder(results);
-        List<Security> candidates = candidates(results);
+        JsonNode lastSearch = lastChoosingSearch(results).orElse(MissingNode.getInstance());
+        List<Security> candidates = ToolResults.matchOf(lastSearch) == Match.CANDIDATES
+                ? securitiesIn(lastSearch.path("securities")) : List.of();
+        List<Security> suggestions = ToolResults.hasSuggestions(lastSearch)
+                ? securitiesIn(lastSearch.path(ToolResults.SUGGESTIONS)) : List.of();
 
         Trace trace = new Trace(traces.nextId(), accountId, sessionId, message, model,
                 result.steps().stream().map(Trace.Step::from).toList(),
                 answer, result.limitReached(), Instant.now());
         traces.save(trace);
 
-        return new ChatResponse(answer, pendingOrder, candidates, result.limitReached(), trace.id());
+        return new ChatResponse(answer, pendingOrder, candidates, suggestions, result.limitReached(), trace.id());
     }
 
     /**
@@ -235,17 +241,24 @@ public class AssistantService {
                 .orElse(null);
     }
 
-    /** Securities to choose from, if the last find_security of this message returned CANDIDATES. */
-    private List<Security> candidates(List<ToolResult> results) {
+    /**
+     * The last find_security of this message that decides what the user is asked: EXACT, CANDIDATES or NOT_FOUND
+     * with suggestions. A NOT_FOUND without suggestions is skipped, like in {@link AmbiguityGuard}: after it the
+     * guard still asks the user to choose from the earlier candidates, so the response must still show them.
+     */
+    private static Optional<JsonNode> lastChoosingSearch(List<ToolResult> results) {
         return results.reversed().stream()
-                .filter(result -> ToolResults.isSuccessOf(result, "find_security"))
-                .map(result -> ToolResults.parse(result.content()))
-                .findFirst()
-                .filter(body -> "CANDIDATES".equals(body.path("match").asText()))
-                .map(body -> StreamSupport.stream(body.path("securities").spliterator(), false)
-                        .map(security -> broker.securityByTicker(security.path("ticker").asText()))
-                        .flatMap(Optional::stream)
-                        .toList())
-                .orElse(List.of());
+                .map(ToolResults::search)
+                .flatMap(Optional::stream)
+                .filter(search -> ToolResults.matchOf(search) != Match.NOT_FOUND || ToolResults.hasSuggestions(search))
+                .findFirst();
+    }
+
+    /** The securities of a list in a tool result, resolved through the catalog. */
+    private List<Security> securitiesIn(JsonNode list) {
+        return StreamSupport.stream(list.spliterator(), false)
+                .map(security -> broker.securityByTicker(security.path("ticker").asText()))
+                .flatMap(Optional::stream)
+                .toList();
     }
 }

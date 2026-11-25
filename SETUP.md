@@ -203,10 +203,10 @@ All endpoints:
 
 | Method | Path | What it does |
 |---|---|---|
-| `POST` | `/chat` | `{sessionId, message}` → `{answer, pendingOrder, candidates, limitReached, traceId}` |
+| `POST` | `/chat` | `{sessionId, message}` → `{answer, pendingOrder, candidates, suggestions, limitReached, traceId}` |
 | `DELETE` | `/chat/{sessionId}` | start the conversation over |
 | `GET` | `/accounts/{accountId}` | your own account; another one is 404 |
-| `GET` | `/securities/search?query=...` | search for a security without the model |
+| `GET` | `/securities/search?query=...` | search for a security without the model; `NOT_FOUND` may carry `suggestions` for a typo |
 | `GET` | `/orders/{id}` | an order and its status |
 | `POST` | `/orders/{id}/confirm` | execute the order (cash, position, price and lifetime are checked again) |
 | `POST` | `/orders/{id}/reject` | reject the order |

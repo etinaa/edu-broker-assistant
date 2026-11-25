@@ -40,7 +40,7 @@ class ChatControllerTest {
     void chatPassesAccountFromHeaderToAssistant() throws Exception {
         when(broker.accountExists("BRK-2")).thenReturn(true);
         when(assistant.chat("BRK-2", "s1", "hi"))
-                .thenReturn(new ChatResponse("ok", null, List.of(), false, "t1"));
+                .thenReturn(new ChatResponse("ok", null, List.of(), List.of(), false, "t1"));
 
         mvc.perform(post("/chat").header("X-Account-Id", "BRK-2")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -104,7 +104,7 @@ class ChatControllerTest {
     void sessionIdOfLettersDigitsDashAndUnderscoreIsAccepted() throws Exception {
         when(broker.accountExists("BRK-1")).thenReturn(true);
         when(assistant.chat("BRK-1", "web_Tab-1", "hi"))
-                .thenReturn(new ChatResponse("ok", null, List.of(), false, "t1"));
+                .thenReturn(new ChatResponse("ok", null, List.of(), List.of(), false, "t1"));
 
         mvc.perform(post("/chat").header("X-Account-Id", "BRK-1").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"sessionId\":\"web_Tab-1\",\"message\":\"hi\"}"))

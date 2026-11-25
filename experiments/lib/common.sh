@@ -272,6 +272,7 @@ show_exchange() {
   jq -r '"answer: " + (.answer // .error // .detail // "—"),
          "pendingOrder: " + (if .pendingOrder then (.pendingOrder | "\(.orderId) \(.side) \(.ticker) \(.quantity) × \(.price) = \(.total), cashAfter \(.cashAfter), \(.status)") else "—" end),
          "candidates: " + ([.candidates[]?.ticker] | if length > 0 then join(", ") else "—" end),
+         "suggestions: " + ([.suggestions[]?.ticker] | if length > 0 then join(", ") else "—" end),
          "limitReached: \(.limitReached // false), traceId: \(.traceId // "—")"' <<<"$RESP" | tee -a "$REPORT"
   jq -r '"trace: model \(.model // "—"), \(.steps // [] | length) steps",
          (.steps[]?.calls[]? | "  \(.tool) \(.arguments) → \(.result | .[0:300])\(if .error then " [error]" else "" end)")' \

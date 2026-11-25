@@ -59,6 +59,26 @@ class GroundedExecutorTest {
     }
 
     @Test
+    void suggestedTickerIsNotSeen() throws Exception {
+        GroundedExecutor executor = executor("buy 10 DEMA",
+                "{\"match\":\"NOT_FOUND\",\"securities\":[],\"suggestions\":[{\"ticker\":\"DEMO\"}]}");
+
+        executor.apply(call("find_security", "{\"query\":\"DEMA\"}"));
+        ToolResult order = executor.apply(call("place_order", "{\"ticker\":\"DEMO\"}"));
+
+        assertTrue(order.error());
+        assertEquals(1, executed.size());
+    }
+
+    @Test
+    void suggestedTickerFromAnEarlierMessageIsSeenSoTheUsersYesCanBeActedOn() throws Exception {
+        Seen seen = new Seen(List.of("buy 10 DEMA", "yes"),
+                List.of("{\"match\":\"NOT_FOUND\",\"securities\":[],\"suggestions\":[{\"ticker\":\"DEMO\"}]}"));
+
+        assertFalse(executor(seen, "{}").apply(call("place_order", "{\"ticker\":\"DEMO\"}")).error());
+    }
+
+    @Test
     void tickerFromAnEarlierResultOfTheSameMessageIsSeen() throws Exception {
         GroundedExecutor executor = executor("buy 2 Training Corp common", "{\"securities\":[{\"ticker\":\"TRNC\"}]}");
 

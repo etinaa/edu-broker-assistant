@@ -52,7 +52,7 @@ public class BrokerTools {
     static final String FIND_SECURITY = """
             {
               "name": "find_security",
-              "description": "Find a security by ticker, ISIN or part of its name. Returns match: EXACT — the security is identified unambiguously; CANDIDATES — several securities match: show the user the options (ticker and name) and ask them to choose, do not choose yourself; NOT_FOUND — no security found, do not make up a ticker. Call it before any action with a security, and before answering any question about one (price, how many the user holds), if the user did not give an exact ticker or ISIN.",
+              "description": "Find a security by ticker, ISIN or part of its name. Returns match: EXACT — the security is identified unambiguously; CANDIDATES — several securities match: show the user the options (ticker and name) and ask them to choose, do not choose yourself; NOT_FOUND — no security found, do not make up a ticker; if it has suggestions (securities with a similar name or ticker, e.g. for a typo), ask the user whether they meant one of them, do not choose yourself. Call it before any action with a security, and before answering any question about one (price, how many the user holds), if the user did not give an exact ticker or ISIN.",
               "input_schema": {
                 "type": "object",
                 "properties": {
@@ -185,6 +185,10 @@ public class BrokerTools {
         if (result.match() == SearchResult.Match.CANDIDATES) {
             // Right where the model decides what to do next: a local model skipped this rule in the description.
             view.put("nextStep", AmbiguityGuard.ASK_FIRST);
+        }
+        if (!result.suggestions().isEmpty()) {
+            view.put(ToolResults.SUGGESTIONS, result.suggestions().stream().map(BrokerTools::securityView).toList());
+            view.put("nextStep", AmbiguityGuard.CONFIRM_SUGGESTION_FIRST);
         }
         return ToolResult.ok(call, toJson(view));
     }

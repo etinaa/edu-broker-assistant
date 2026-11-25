@@ -59,6 +59,24 @@ class BrokerToolsFindSecurityTest {
     }
 
     @Test
+    void aTypoIsNotFoundWithSuggestionsAndTheQuestionToAsk() throws Exception {
+        JsonNode body = MAPPER.readTree(find("DEMA").content());
+
+        assertEquals("NOT_FOUND", body.get("match").asText());
+        assertEquals(0, body.get("securities").size());
+        assertEquals("DEMO", body.get("suggestions").get(0).get("ticker").asText());
+        assertEquals(AmbiguityGuard.CONFIRM_SUGGESTION_FIRST, body.get("nextStep").asText());
+    }
+
+    @Test
+    void notFoundWithoutSuggestionsHasNeitherSuggestionsNorNextStep() throws Exception {
+        JsonNode body = MAPPER.readTree(find("Tesla").content());
+
+        assertFalse(body.has("suggestions"));
+        assertFalse(body.has("nextStep"));
+    }
+
+    @Test
     void unknownAndEmptyQueryAreNotFoundNotError() throws Exception {
         for (String query : new String[]{"zzz-nothing", ""}) {
             ToolResult result = find(query);

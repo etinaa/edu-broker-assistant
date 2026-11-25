@@ -281,7 +281,8 @@ public class BrokerService {
      *   <li>exact ticker or ISIN, case-insensitive → EXACT;</li>
      *   <li>otherwise by name (normalized substring: case, extra spaces, dots):
      *       one security → EXACT, several → CANDIDATES;</li>
-     *   <li>nothing → NOT_FOUND. An empty or null query is also NOT_FOUND, not an exception.</li>
+     *   <li>nothing → NOT_FOUND, with {@link TypoSuggestions} for a name or ticker a few typos away.
+     *       An empty or null query is also NOT_FOUND, not an exception.</li>
      * </ol>
      */
     public SearchResult findSecurity(String query) {
@@ -309,9 +310,9 @@ public class BrokerService {
                 .filter(security -> normalizeName(security.name()).contains(normalizedQuery))
                 .toList();
 
-        // 3. Nothing → NOT_FOUND, one security → EXACT, several → CANDIDATES.
+        // 3. Nothing → NOT_FOUND with "did you mean", one security → EXACT, several → CANDIDATES.
         if (byName.isEmpty()) {
-            return SearchResult.notFound();
+            return SearchResult.notFound(TypoSuggestions.find(normalizedQuery, all));
         } else if (byName.size() == 1) {
             return SearchResult.exact(byName.getFirst());
         } else {
@@ -320,7 +321,7 @@ public class BrokerService {
     }
 
     /** Case, dots and extra spaces do not affect the name search: "Sample  Logistics Ltd." ≡ "sample logistics ltd". */
-    private static String normalizeName(String name) {
+    static String normalizeName(String name) {
         return WHITESPACE.matcher(name.toLowerCase(Locale.ROOT).replace('.', ' ').trim()).replaceAll(" ");
     }
 }

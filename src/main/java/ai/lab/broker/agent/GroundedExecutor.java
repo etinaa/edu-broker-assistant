@@ -4,10 +4,9 @@ import ai.lab.broker.llm.ToolConversation.Seen;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.HashSet;
 import java.util.List;
@@ -25,14 +24,15 @@ import java.util.regex.Pattern;
  * <p>
  * The user's messages count as typed. From tool results only the values of {@code ticker} fields count: keys and
  * constants ({@code ticker}, {@code USD}, {@code EXACT}) and free text such as a refusal message that repeats the
- * requested ticker are not identifiers the model may use.
+ * requested ticker are not identifiers the model may use. Nor are the {@code suggestions} of a find_security that
+ * found nothing (task 10) in the current message: "DEMA" → DEMO is a guess until the user answers. Suggestions from
+ * earlier messages count, like earlier candidates: the user has seen them and may have answered "yes"
+ * ({@link AmbiguityGuard} keeps place_order blocked for the rest of the message that got them).
  */
 public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
 
     /** Only identifiers are checked: the model must not derive them. */
     private static final List<String> IDENTIFIER_ARGUMENTS = List.of("ticker");
-
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     /** Tokens are runs of letters, digits and hyphens: "TRNC," and "(trnc)" both give the token trnc. */
     private static final Pattern TOKEN_SEPARATORS = Pattern.compile("[^\\p{L}\\d-]+");
@@ -44,7 +44,7 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
     public GroundedExecutor(Seen seenSoFar, Function<ToolCall, ToolResult> delegate) {
         this.delegate = delegate;
         seenSoFar.userMessages().forEach(this::addTokensOf);
-        seenSoFar.toolResults().forEach(this::addTickersOf);
+        seenSoFar.toolResults().forEach(result -> addTickersOf(ToolResults.parse(result)));
     }
 
     @Override
@@ -62,21 +62,26 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         }
         ToolResult result = delegate.apply(call);
         if (!result.error()) {
-            addTickersOf(result.content());
+            addMatchedTickersOf(result.content());
         }
         return result;
     }
 
-    /** Values of every ticker field, at any depth; a result that is not JSON adds nothing. */
-    private void addTickersOf(String toolResult) {
-        try {
-            for (JsonNode ticker : JSON.readTree(toolResult).findValues("ticker")) {
-                if (ticker.isTextual()) {
-                    addTokensOf(ticker.asText());
-                }
+    /** A result of this message: its tickers without the suggestions, which the user has not answered yet. */
+    private void addMatchedTickersOf(String toolResult) {
+        JsonNode root = ToolResults.parse(toolResult);
+        if (root instanceof ObjectNode object) {
+            object.remove(ToolResults.SUGGESTIONS);
+        }
+        addTickersOf(root);
+    }
+
+    /** Values of every ticker field, at any depth; a result that is not JSON parses as empty and adds nothing. */
+    private void addTickersOf(JsonNode toolResult) {
+        for (JsonNode ticker : toolResult.findValues("ticker")) {
+            if (ticker.isTextual()) {
+                addTokensOf(ticker.asText());
             }
-        } catch (JsonProcessingException e) {
-            // Not JSON: free text is not a source of identifiers.
         }
     }
 
