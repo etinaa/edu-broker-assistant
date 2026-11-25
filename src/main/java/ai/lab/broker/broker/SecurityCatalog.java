@@ -29,6 +29,21 @@ public class SecurityCatalog {
         securities.addAll(DEMO_SECURITIES);
     }
 
+    /** Changes the current price of a security (task 6b: the price moves between placing and confirming). */
+    public void updatePrice(String ticker, BigDecimal price) {
+        Security security = byTicker(ticker)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown ticker " + ticker));
+        securities.replaceAll(s -> s == security
+                ? new Security(s.ticker(), s.isin(), s.name(), price)
+                : s);
+    }
+
+    /** Back to the demo prices; lets tests share one Spring context. */
+    public void reset() {
+        securities.clear();
+        securities.addAll(DEMO_SECURITIES);
+    }
+
     public List<Security> all() {
         return List.copyOf(securities);
     }

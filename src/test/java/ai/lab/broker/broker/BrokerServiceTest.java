@@ -24,12 +24,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class BrokerServiceTest {
 
     private OrderBook orders;
+    private SecurityCatalog catalog;
+    private MutableClock clock;
     private BrokerService service;
 
     @BeforeEach
     void setUp() {
         orders = new OrderBook();
-        service = new BrokerService(new SecurityCatalog(), new AccountRepository(), orders);
+        catalog = new SecurityCatalog();
+        clock = new MutableClock();
+        service = TestBroker.with(catalog, orders, clock);
     }
 
     private static void assertMoney(String expected, BigDecimal actual) {
@@ -142,6 +146,108 @@ class BrokerServiceTest {
         assertEquals(22L, after.quantityByTicker("TRNC"));
         assertNotSame(service.accountById("BRK-1").orElseThrow(), after);
         assertTrue(service.accountSnapshot("nope").isEmpty());
+    }
+
+    // ---- task 6: confirmation re-checks ----
+
+    @Test
+    void twoOrdersOf15DemoBothPassAtPlacementButOnlyTheFirstCanBeConfirmed() {
+        // 15 * 410.00 = 6150.00 each; 10000.00 covers one of them, not both.
+        Order first = placeOk("BRK-1", OrderSide.BUY, "DEMO", 15);
+        Order second = placeOk("BRK-1", OrderSide.BUY, "DEMO", 15);
+
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", first.getId()));
+        OrderDecision d = service.confirmOrder("BRK-1", second.getId());
+
+        assertEquals(Reason.INSUFFICIENT_FUNDS, refusedReason(d));
+        assertMoney("2300.00", ((OrderDecision.Refused) d).shortfall());
+        assertMoney("3850.00", service.accountById("BRK-1").orElseThrow().getCash());
+        assertEquals(OrderStatus.FAILED, second.getStatus());
+    }
+
+    @Test
+    void buyExecutesAtCurrentPriceWhenItRoseExactlyByTheAllowedPercent() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 10);
+        catalog.updatePrice("DEMO", new BigDecimal("418.20")); // +2.00%
+
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
+
+        assertMoney("5818.00", service.accountById("BRK-1").orElseThrow().getCash()); // 10000 - 10 * 418.20
+        assertEquals("Order confirmed at 418.20 USD", order.getReason());
+    }
+
+    @Test
+    void buyFailsWhenPriceRoseByMoreThanAllowedAndAccountIsUntouched() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 10);
+        catalog.updatePrice("DEMO", new BigDecimal("418.21"));
+
+        OrderDecision d = service.confirmOrder("BRK-1", order.getId());
+
+        assertEquals(Reason.PRICE_CHANGED, refusedReason(d));
+        assertEquals("Price of DEMO moved from 410.00 to 418.21 USD, more than the allowed 2%; place a new order",
+                refusedMessage(d));
+        assertEquals(OrderStatus.FAILED, order.getStatus());
+        Account account = service.accountById("BRK-1").orElseThrow();
+        assertMoney("10000.00", account.getCash());
+        assertEquals(5L, account.quantityByTicker("DEMO"));
+    }
+
+    @Test
+    void buyExecutesAtTheLowerPriceWhenPriceFell() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 10);
+        catalog.updatePrice("DEMO", new BigDecimal("300.00"));
+
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
+
+        assertMoney("7000.00", service.accountById("BRK-1").orElseThrow().getCash());
+    }
+
+    @Test
+    void sellFailsWhenPriceFellByMoreThanAllowedButExecutesWhenItRose() {
+        Order falling = placeOk("BRK-1", OrderSide.SELL, "TRNC", 1);
+        catalog.updatePrice("TRNC", new BigDecimal("181.00")); // -2.29%
+        assertEquals(Reason.PRICE_CHANGED, refusedReason(service.confirmOrder("BRK-1", falling.getId())));
+
+        Order rising = placeOk("BRK-1", OrderSide.SELL, "TRNC", 1);
+        catalog.updatePrice("TRNC", new BigDecimal("200.00"));
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", rising.getId()));
+
+        assertMoney("10200.00", service.accountById("BRK-1").orElseThrow().getCash());
+    }
+
+    @Test
+    void orderCanBeConfirmedUntilTheEndOfItsLifetime() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 1);
+        clock.advance(TestBroker.PROPERTIES.orderTtl());
+
+        assertInstanceOf(OrderDecision.Confirmed.class, service.confirmOrder("BRK-1", order.getId()));
+    }
+
+    @Test
+    void expiredOrderCannotBeConfirmedOrRejectedAndAccountIsUntouched() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 1);
+        clock.advance(TestBroker.PROPERTIES.orderTtl().plusSeconds(1));
+
+        OrderDecision d = service.confirmOrder("BRK-1", order.getId());
+
+        assertEquals(Reason.ORDER_EXPIRED, refusedReason(d));
+        assertEquals(OrderStatus.EXPIRED, order.getStatus());
+        assertEquals("Can't reject order with status = EXPIRED",
+                refusedMessage(service.rejectOrder("BRK-1", order.getId())));
+        assertMoney("10000.00", service.accountById("BRK-1").orElseThrow().getCash());
+    }
+
+    @Test
+    void overdueOrderIsShownAsExpiredWhenRead() {
+        Order order = placeOk("BRK-1", OrderSide.BUY, "DEMO", 1);
+        clock.advance(TestBroker.PROPERTIES.orderTtl().plusSeconds(1));
+
+        assertEquals(OrderStatus.EXPIRED, service.orderById(order.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void orderTimeComesFromTheClock() {
+        assertEquals(clock.instant(), placeOk("BRK-1", OrderSide.BUY, "DEMO", 1).getCreatedAt());
     }
 
     // ---- placeOrder ----
@@ -406,7 +512,7 @@ class BrokerServiceTest {
     @Test
     void confirmFailsWithoutFreeTradeWhenTickerIsUnknown() {
         Account account = service.accountById("BRK-1").orElseThrow();
-        Order ghost = new Order("ORD-GHOST", "BRK-1", OrderSide.BUY, "GHOST", 10, new BigDecimal("1.00"));
+        Order ghost = new Order("ORD-GHOST", "BRK-1", OrderSide.BUY, "GHOST", 10, new BigDecimal("1.00"), clock.instant());
         orders.add(ghost);
 
         OrderDecision d = service.confirmOrder("BRK-1", ghost.getId());
@@ -561,13 +667,13 @@ class BrokerServiceTest {
     void findByTickerWhenIsinAndNameDoNotMatch() {
         // In the demo data every ISIN contains its ticker, so the ticker-only branch needs a custom catalog.
         Security odd = new Security("ABCD", "XX9999999999", "Unrelated Name", new BigDecimal("1.00"));
-        SecurityCatalog catalog = new SecurityCatalog() {
+        SecurityCatalog oddCatalog = new SecurityCatalog() {
             @Override
             public java.util.List<Security> all() {
                 return java.util.List.of(odd);
             }
         };
-        BrokerService custom = new BrokerService(catalog, new AccountRepository(), new OrderBook());
+        BrokerService custom = TestBroker.with(oddCatalog, new OrderBook(), clock);
 
         SearchResult r = custom.findSecurity("abcd");
 
@@ -640,13 +746,13 @@ class BrokerServiceTest {
     void findExactTickerWinsOverNameCandidates() {
         Security alpha = new Security("TEST", "XX0000000001", "Test Alpha Inc.", new BigDecimal("1.00"));
         Security beta = new Security("TSTB", "XX0000000002", "Test Beta Inc.", new BigDecimal("2.00"));
-        SecurityCatalog catalog = new SecurityCatalog() {
+        SecurityCatalog oddCatalog = new SecurityCatalog() {
             @Override
             public java.util.List<Security> all() {
                 return java.util.List.of(alpha, beta);
             }
         };
-        BrokerService custom = new BrokerService(catalog, new AccountRepository(), new OrderBook());
+        BrokerService custom = TestBroker.with(oddCatalog, new OrderBook(), clock);
 
         SearchResult byTicker = custom.findSecurity("test");
         assertEquals(Match.EXACT, byTicker.match());

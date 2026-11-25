@@ -1,5 +1,6 @@
 package ai.lab.broker.broker;
 
+import ai.lab.broker.config.BrokerProperties;
 import ai.lab.broker.domain.*;
 
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,9 @@ import org.apache.commons.lang3.Strings;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -18,6 +22,18 @@ import java.util.Optional;
  * Thread safety (task 6): methods that read and then change an order or an account are {@code synchronized}, so a
  * check ("status is PENDING", "enough cash") and the change that follows it cannot interleave with another request.
  * One lock for the whole service is enough for this in-memory demo; with a database it would be a lock per account.
+ * <p>
+ * Confirmation rules (task 6), set in {@link BrokerProperties}:
+ * <ul>
+ *   <li>an order lives {@code broker.order-ttl}; after that it is EXPIRED, checked when it is read or confirmed
+ *       (no background job: nothing can happen to an order that nobody touches);</li>
+ *   <li>the trade is executed at the current price, because that is the price the market gives now. If the price
+ *       moved against the client (up for BUY, down for SELL) by more than {@code broker.max-price-move-percent},
+ *       the order fails with PRICE_CHANGED and the client places a new one at the new price; a move in the
+ *       client's favour is executed;</li>
+ *   <li>cash and the position are re-checked at the current price, so two orders that each passed at placement
+ *       cannot both spend the same money.</li>
+ * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -26,6 +42,8 @@ public class BrokerService {
     private final SecurityCatalog securities;
     private final AccountRepository accounts;
     private final OrderBook orders;
+    private final BrokerProperties properties;
+    private final Clock clock;
 
     public Optional<BigDecimal> currentPriceByTicker(String ticker) {
         return securities.byTicker(ticker).map(Security::currentPrice);
@@ -48,8 +66,18 @@ public class BrokerService {
                 .map(account -> new Account(account.getId(), account.getCash(), account.getPositions()));
     }
 
-    public Optional<Order> orderById(String orderId) {
-        return orders.byId(orderId);
+    /** The order with its status as of now: a pending order past its lifetime is marked EXPIRED first. */
+    public synchronized Optional<Order> orderById(String orderId) {
+        Optional<Order> order = orders.byId(orderId);
+        order.ifPresent(this::expireIfOverdue);
+        return order;
+    }
+
+    private void expireIfOverdue(Order order) {
+        Instant deadline = order.getCreatedAt().plus(properties.orderTtl());
+        if (order.getStatus() == OrderStatus.PENDING_CONFIRMATION && Instant.now(clock).isAfter(deadline)) {
+            order.setStatus(OrderStatus.EXPIRED, "Not confirmed within " + properties.orderTtl());
+        }
     }
 
     /**
@@ -101,15 +129,15 @@ public class BrokerService {
 
     private Order createOrder(String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {
         String orderId = orders.nextId();
-        Order order = new Order(orderId, accountId, side, ticker, quantity, price);
+        Order order = new Order(orderId, accountId, side, ticker, quantity, price, Instant.now(clock));
         orders.add(order);
         return order;
     }
 
     /**
-     * Task 1 (basic execution) and task 6 (repeated checks). Only for PENDING_CONFIRMATION:
-     * re-check the cash or the position at the current price; on success update the account, mark the order
-     * EXECUTED and return Confirmed; on failure mark it FAILED and return Refused with the reason.
+     * Task 1 (basic execution) and task 6 (repeated checks). Only for PENDING_CONFIRMATION that has not expired:
+     * check the price move, re-check the cash or the position at the current price; on success update the account,
+     * mark the order EXECUTED and return Confirmed; on failure mark it FAILED and return Refused with the reason.
      * A repeated confirm is Refused and does not change the account a second time.
      */
     public synchronized OrderDecision confirmOrder(String accountId, String orderId) {
@@ -128,6 +156,9 @@ public class BrokerService {
         }
         Account account = optAccount.get();
 
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            return OrderDecision.Refused.orderExpired(orderId);
+        }
         if (order.getStatus() != OrderStatus.PENDING_CONFIRMATION) {
             return OrderDecision.Refused.cannotConfirm(order.getStatus());
         }
@@ -137,6 +168,10 @@ public class BrokerService {
             return failOrder(order, OrderDecision.Refused.unknownSecurity(order.getTicker()));
         }
         BigDecimal price = optPrice.get();
+        if (movedAgainstClient(order, price)) {
+            return failOrder(order, OrderDecision.Refused.priceChanged(order.getTicker(), order.getPrice(), price,
+                    properties.maxPriceMovePercent()));
+        }
         long quantity = order.getQuantity();
 
         if (order.getSide() == OrderSide.BUY) {
@@ -149,8 +184,18 @@ public class BrokerService {
                     OrderDecision.Refused.insufficientPosition(quantity, account.quantityByTicker(order.getTicker())));
         }
 
-        order.setStatus(OrderStatus.EXECUTED, "Order confirmed");
+        order.setStatus(OrderStatus.EXECUTED, "Order confirmed at " + price.toPlainString() + " USD");
         return new OrderDecision.Confirmed(order);
+    }
+
+    /** BUY: the price rose by more than allowed; SELL: it fell by more than allowed. Exactly at the limit is fine. */
+    private boolean movedAgainstClient(Order order, BigDecimal currentPrice) {
+        BigDecimal adverseMove = order.getSide() == OrderSide.BUY
+                ? currentPrice.subtract(order.getPrice())
+                : order.getPrice().subtract(currentPrice);
+        BigDecimal allowed = order.getPrice().multiply(properties.maxPriceMovePercent())
+                .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP);
+        return adverseMove.compareTo(allowed) > 0;
     }
 
     /** The re-check at confirm time failed: the order becomes FAILED with the reason, the account stays untouched. */

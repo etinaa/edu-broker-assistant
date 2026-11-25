@@ -66,6 +66,20 @@ public sealed interface OrderDecision {
                     needed, available, shortfall);
         }
 
+        /** The price moved against the client by more than allowed; numbers: order price, current price. */
+        public static Refused priceChanged(String ticker, BigDecimal orderPrice, BigDecimal currentPrice,
+                                           BigDecimal maxMovePercent) {
+            return new Refused(Reason.PRICE_CHANGED,
+                    "Price of " + ticker + " moved from " + orderPrice.toPlainString() + " to "
+                            + currentPrice.toPlainString() + " USD, more than the allowed "
+                            + maxMovePercent.stripTrailingZeros().toPlainString() + "%; place a new order");
+        }
+
+        public static Refused orderExpired(String orderId) {
+            return new Refused(Reason.ORDER_EXPIRED,
+                    "Order " + orderId + " expired before it was confirmed; place a new order");
+        }
+
         public static Refused insufficientPosition(long needed, long available) {
             long shortfall = needed - available;
             return new Refused(Reason.INSUFFICIENT_POSITION,
@@ -82,5 +96,8 @@ public sealed interface OrderDecision {
     record Rejected(Order order) implements OrderDecision {}
 
     /** Machine-readable refusal category. */
-    enum Reason { ILLEGAL_ACCESS, INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY }
+    enum Reason {
+        ILLEGAL_ACCESS, INSUFFICIENT_FUNDS, INSUFFICIENT_POSITION, INVALID_QUANTITY, UNKNOWN_SECURITY,
+        PRICE_CHANGED, ORDER_EXPIRED
+    }
 }

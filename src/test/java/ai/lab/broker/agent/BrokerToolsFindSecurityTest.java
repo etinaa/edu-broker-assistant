@@ -1,9 +1,7 @@
 package ai.lab.broker.agent;
 
-import ai.lab.broker.broker.AccountRepository;
 import ai.lab.broker.broker.BrokerService;
-import ai.lab.broker.broker.OrderBook;
-import ai.lab.broker.broker.SecurityCatalog;
+import ai.lab.broker.broker.TestBroker;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,7 +20,7 @@ class BrokerToolsFindSecurityTest {
 
     @BeforeEach
     void setUp() {
-        tools = new BrokerTools(new BrokerService(new SecurityCatalog(), new AccountRepository(), new OrderBook()));
+        tools = new BrokerTools(TestBroker.demo());
     }
 
     private ToolResult find(String query) {

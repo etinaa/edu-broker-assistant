@@ -22,9 +22,10 @@ public class Order {
     private OrderStatus status;
     private String reason;
 
-    public Order(String id, String accountId, OrderSide side, String ticker, long quantity, BigDecimal price) {
+    public Order(String id, String accountId, OrderSide side, String ticker, long quantity, BigDecimal price,
+                 Instant createdAt) {
         this.id = id;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt;
         this.accountId = accountId;
         this.side = side;
         this.ticker = ticker;

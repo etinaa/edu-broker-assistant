@@ -8,8 +8,11 @@ public enum OrderStatus {
     EXECUTED,
     /** Rejected by the user. */
     REJECTED_BY_USER,
-    /** Confirmed, but the re-check at confirm time failed (not enough cash or securities any more). */
+    /**
+     * Confirmed, but the re-check at confirm time failed: not enough cash or securities any more, or the price moved
+     * against the client by more than broker.max-price-move-percent.
+     */
     FAILED,
-    /** Not confirmed in time (task 6c). */
+    /** Not confirmed within broker.order-ttl (task 6c). */
     EXPIRED
 }

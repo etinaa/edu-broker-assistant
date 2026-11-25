@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -39,7 +40,7 @@ class OrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        order = new Order("ORD-1", "BRK-1", OrderSide.BUY, "TRNC", 2, new BigDecimal("185.25"));
+        order = new Order("ORD-1", "BRK-1", OrderSide.BUY, "TRNC", 2, new BigDecimal("185.25"), Instant.now());
         when(broker.orderById("ORD-1")).thenReturn(Optional.of(order));
     }
 

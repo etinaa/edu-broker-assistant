@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,7 +27,7 @@ class OrderBookTest {
     }
 
     private static Order order(String id) {
-        return new Order(id, "BRK-1", OrderSide.BUY, "TRNC", 1, new BigDecimal("185.25"));
+        return new Order(id, "BRK-1", OrderSide.BUY, "TRNC", 1, new BigDecimal("185.25"), Instant.now());
     }
 
     @Test

@@ -1,9 +1,7 @@
 package ai.lab.broker.agent;
 
-import ai.lab.broker.broker.AccountRepository;
 import ai.lab.broker.broker.BrokerService;
-import ai.lab.broker.broker.OrderBook;
-import ai.lab.broker.broker.SecurityCatalog;
+import ai.lab.broker.broker.TestBroker;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,7 +21,7 @@ class BrokerToolsGetQuoteTest {
 
     @BeforeEach
     void setUp() {
-        broker = new BrokerService(new SecurityCatalog(), new AccountRepository(), new OrderBook());
+        broker = TestBroker.demo();
         tools = new BrokerTools(broker);
     }
 

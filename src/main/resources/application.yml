@@ -27,6 +27,12 @@ agent:
   max-sessions: 1000
   max-traces: 1000
 
+broker:
+  # An order not confirmed within this time is EXPIRED.
+  order-ttl: 5m
+  # How far the price may move against the client (BUY: up, SELL: down) before confirm fails with PRICE_CHANGED.
+  max-price-move-percent: 2
+
 management:
   endpoints:
     web:

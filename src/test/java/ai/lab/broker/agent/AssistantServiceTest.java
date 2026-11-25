@@ -1,9 +1,7 @@
 package ai.lab.broker.agent;
 
-import ai.lab.broker.broker.AccountRepository;
 import ai.lab.broker.broker.BrokerService;
-import ai.lab.broker.broker.OrderBook;
-import ai.lab.broker.broker.SecurityCatalog;
+import ai.lab.broker.broker.TestBroker;
 import ai.lab.broker.config.AgentProperties;
 import ai.lab.broker.domain.OrderSide;
 import ai.lab.broker.domain.OrderStatus;
@@ -43,7 +41,7 @@ class AssistantServiceTest {
 
     @BeforeEach
     void setUp() {
-        broker = new BrokerService(new SecurityCatalog(), new AccountRepository(), new OrderBook());
+        broker = TestBroker.demo();
         traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100));
         service = new AssistantService((system, tools) -> {
             created++;
