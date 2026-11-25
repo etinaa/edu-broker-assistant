@@ -44,6 +44,12 @@ public final class ToolLoop {
      */
     public static Result run(ToolConversation conversation, Function<ToolCall, ToolResult> executor, int maxSteps)
             throws InterruptedException {
+        return run(conversation, executor, maxSteps, ChatListener.NONE);
+    }
+
+    /** As {@link #run(ToolConversation, Function, int)}, reporting each call and its result to the listener. */
+    public static Result run(ToolConversation conversation, Function<ToolCall, ToolResult> executor, int maxSteps,
+                             ChatListener listener) throws InterruptedException {
         if (maxSteps <= 0) {
             throw new IllegalArgumentException("maxSteps must be positive: " + maxSteps);
         }
@@ -59,12 +65,27 @@ public final class ToolLoop {
             // and each call still needs a result, otherwise the provider rejects the history.
             List<ToolResult> results = new ArrayList<>();
             for (ToolCall call : turn.calls()) {
-                results.add(turn.truncated() ? ToolResult.error(call, CALL_TRUNCATED) : execute(executor, call));
+                report(() -> listener.toolCall(call));
+                ToolResult result = turn.truncated() ? ToolResult.error(call, CALL_TRUNCATED) : execute(executor, call);
+                report(() -> listener.toolResult(result));
+                results.add(result);
             }
             conversation.addToolResults(results);
             steps.add(new Step(results, turn.response()));
         }
         return new Result(steps, steps.getLast().response().text(), true, false);
+    }
+
+    /**
+     * Reporting progress must not fail the message: a listener is told not to throw, and if it does anyway (after
+     * place_order created an order, say), the loop goes on and the exception only goes to the log.
+     */
+    private static void report(Runnable notification) {
+        try {
+            notification.run();
+        } catch (RuntimeException e) {
+            log.warn("Chat listener failed", e);
+        }
     }
 
     /** Everything send() throws is the provider's failure, so it is marked apart from failures of our own code. */

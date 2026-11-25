@@ -92,6 +92,15 @@ public class AssistantService {
      * cancelled. The user never saw them, and a retry must not leave a duplicate.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
+        return chat(accountId, sessionId, message, ChatListener.NONE);
+    }
+
+    /**
+     * As {@link #chat(String, String, String)}, reporting every tool call and result to the listener as it happens
+     * (POST /chat/stream). The returned response is still the only authoritative result: a message that fails after
+     * some calls were reported is rolled back like any other.
+     */
+    public ChatResponse chat(String accountId, String sessionId, String message, ChatListener listener) {
         SessionStore.Session session = lockCurrentSession(accountId, sessionId);
         try {
             ToolConversation conversation = session.conversation();
@@ -100,7 +109,7 @@ public class AssistantService {
             List<ToolResult> executed = new ArrayList<>();
             conversation.addUserMessage(message);
             try {
-                ToolLoop.Result result = runLoop(conversation, new GroundedExecutor(conversation.seen(),
+                ToolLoop.Result result = runLoop(conversation, listener, new GroundedExecutor(conversation.seen(),
                         new AmbiguityGuard(new SingleOrderGuard(call -> {
                             ToolResult toolResult = tools.execute(accountId, call);
                             executed.add(toolResult);
@@ -184,9 +193,10 @@ public class AssistantService {
         });
     }
 
-    private ToolLoop.Result runLoop(ToolConversation conversation, Function<ToolCall, ToolResult> executor) {
+    private ToolLoop.Result runLoop(ToolConversation conversation, ChatListener listener,
+                                    Function<ToolCall, ToolResult> executor) {
         try {
-            return ToolLoop.run(conversation, executor, agent.maxSteps());
+            return ToolLoop.run(conversation, executor, agent.maxSteps(), listener);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssistantUnavailableException("The request to the model was interrupted", e);

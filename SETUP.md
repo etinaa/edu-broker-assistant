@@ -125,6 +125,8 @@ run. What can be tuned:
 | `agent.max-sessions-per-account` | `20` | sessions one account keeps; its own least recently used one is evicted, never another account's or a busy one |
 | `agent.max-traces` | `1000` | traces kept in memory; the oldest one is evicted |
 | `agent.session-busy-timeout` | `2s` | how long a message waits for another message of the same session before 409 |
+| `agent.max-streams` | `50` | how many `POST /chat/stream` requests are answered at once; one more is 503 |
+| `agent.stream-timeout` | `5m` | how long `POST /chat/stream` keeps the connection; a message still running then goes on without the client |
 
 **`broker` — order rules**
 
@@ -204,6 +206,7 @@ All endpoints:
 | Method | Path | What it does |
 |---|---|---|
 | `POST` | `/chat` | `{sessionId, message}` → `{answer, pendingOrder, candidates, suggestions, limitReached, traceId}` |
+| `POST` | `/chat/stream` | the same as `/chat`, as server-sent events: `tool_call` {tool} and `tool_result` {tool, arguments, error} while the model works, then `response` (the `/chat` body) or `error` (a ProblemDetail: 409 busy session, 502 model unavailable, 500); 503 before the stream when `agent.max-streams` are running |
 | `DELETE` | `/chat/{sessionId}` | start the conversation over |
 | `GET` | `/accounts/{accountId}` | your own account; another one is 404 |
 | `GET` | `/securities/search?query=...` | search for a security without the model; `NOT_FOUND` may carry `suggestions` for a typo |

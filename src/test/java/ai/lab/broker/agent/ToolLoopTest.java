@@ -71,6 +71,72 @@ class ToolLoopTest {
         assertEquals("The portfolio holds", result.answer());
     }
 
+    /** Records what the loop reports, as "call tool" and "result tool error" lines. */
+    private static final class RecordingListener implements ChatListener {
+        final List<String> events = new ArrayList<>();
+
+        @Override
+        public void toolCall(ToolConversation.ToolCall call) {
+            events.add("call " + call.name());
+        }
+
+        @Override
+        public void toolResult(ToolConversation.ToolResult result) {
+            events.add("result " + result.call().name() + " " + result.error());
+        }
+    }
+
+    @Test
+    void theListenerGetsEachCallBeforeItRunsAndItsResultAfter() throws Exception {
+        RecordingListener listener = new RecordingListener();
+
+        ToolLoop.run(new TwoStepConversation(), call -> {
+            listener.events.add("run " + call.name());
+            return ToolConversation.ToolResult.ok(call, "{}");
+        }, 3, listener);
+
+        assertEquals(List.of("call get_quote", "run get_quote", "result get_quote false"), listener.events);
+    }
+
+    @Test
+    void theListenerGetsTheErrorResultOfAFailedToolAndOfACallThatWasNotRun() throws Exception {
+        RecordingListener failed = new RecordingListener();
+        ToolLoop.run(new TwoStepConversation(), call -> {
+            throw new IllegalStateException("boom");
+        }, 3, failed);
+
+        RecordingListener cutOff = new RecordingListener();
+        ToolLoop.run(new TwoStepConversation(new Turn(List.of(CALL), TwoStepConversation.response(""), true),
+                new Turn(List.of(), TwoStepConversation.response("done"))), call -> null, 3, cutOff);
+
+        assertEquals(List.of("call get_quote", "result get_quote true"), failed.events);
+        assertEquals(List.of("call get_quote", "result get_quote true"), cutOff.events);
+    }
+
+    @Test
+    void aListenerThatThrowsDoesNotFailTheMessage() throws Exception {
+        ChatListener broken = new ChatListener() {
+            @Override
+            public void toolCall(ToolConversation.ToolCall call) {
+                throw new IllegalStateException("client gone");
+            }
+
+            @Override
+            public void toolResult(ToolConversation.ToolResult result) {
+                throw new IllegalStateException("client gone");
+            }
+        };
+        List<ToolConversation.ToolCall> executed = new ArrayList<>();
+
+        ToolLoop.Result result = ToolLoop.run(new TwoStepConversation(), call -> {
+            executed.add(call);
+            return ToolConversation.ToolResult.ok(call, "{}");
+        }, 3, broken);
+
+        assertEquals(1, executed.size());
+        assertEquals("done", result.answer());
+    }
+
     /** Plays the scripted turns; by default asks for one tool call, then answers "done". Keeps the tool results sent. */
     private static final class TwoStepConversation implements ToolConversation {
         private final Deque<Turn> script;

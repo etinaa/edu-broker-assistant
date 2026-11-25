@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.NoSuchElementException;
 
@@ -24,10 +25,12 @@ class ChatController {
 
     private final AssistantService assistant;
     private final BrokerService broker;
+    private final ChatStreams streams;
 
-    ChatController(AssistantService assistant, BrokerService broker) {
+    ChatController(AssistantService assistant, BrokerService broker, ChatStreams streams) {
         this.assistant = assistant;
         this.broker = broker;
+        this.streams = streams;
     }
 
     /**
@@ -38,6 +41,16 @@ class ChatController {
     ChatResponse chat(@RequestHeader(ACCOUNT_HEADER) String accountId, @Valid @RequestBody ChatRequest request) {
         requireAccount(accountId);
         return assistant.chat(accountId, request.sessionId(), request.message());
+    }
+
+    /**
+     * /chat with progress as server-sent events (see {@link ChatStreams}). The account and the request body are
+     * checked first, so an unknown account or an invalid body is still an ordinary 404 or 400.
+     */
+    @PostMapping("/chat/stream")
+    SseEmitter stream(@RequestHeader(ACCOUNT_HEADER) String accountId, @Valid @RequestBody ChatRequest request) {
+        requireAccount(accountId);
+        return streams.start(accountId, request.sessionId(), request.message());
     }
 
     /** Start the conversation over: the session history is deleted. */

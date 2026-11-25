@@ -30,6 +30,10 @@ agent:
   max-traces: 1000
   # How long a message waits for another message of the same session before 409 "session busy".
   session-busy-timeout: 2s
+  # How long POST /chat/stream keeps the connection open; a message still running then goes on without the client.
+  stream-timeout: 5m
+  # POST /chat/stream answered at once; one more is 503. /chat is bounded by the request threads, streams are not.
+  max-streams: 50
 
 broker:
   # An order not confirmed within this time is EXPIRED.

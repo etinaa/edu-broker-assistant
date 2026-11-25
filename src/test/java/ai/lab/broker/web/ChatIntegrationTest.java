@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.io.IOException;
@@ -33,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -376,5 +378,68 @@ class ChatIntegrationTest {
         chat("BRK-1", "s1", " ").andExpect(status().isBadRequest());
 
         assertTrue(model.conversations().isEmpty());
+    }
+
+    // ---- /chat/stream ----
+
+    private List<SseEvents.Event> stream(String accountId, String sessionId, String message) throws Exception {
+        String body = JSON.createObjectNode().put("sessionId", sessionId).put("message", message).toString();
+        MvcResult result = mvc.perform(post("/chat/stream").header(HEADER, accountId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        return SseEvents.await(result);
+    }
+
+    @Test
+    void streamedBuyReportsEachStepAndEndsWithTheSameResponseAsChat() throws Exception {
+        model.callsTool("find_security", "{\"query\":\"Training Corp common\"}")
+                .callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .answers("Order for 2 TRNC is ready, confirm it in the UI");
+
+        List<SseEvents.Event> events = stream("BRK-1", "s1", "buy 2 Training Corp common");
+
+        assertEquals(List.of("tool_call", "tool_result", "tool_call", "tool_result", "response"),
+                SseEvents.names(events));
+        assertEquals("find_security", events.get(0).data().path("tool").asText());
+        assertEquals("place_order", events.get(2).data().path("tool").asText());
+        assertEquals(2, events.get(3).data().path("arguments").path("quantity").asInt());
+
+        JsonNode response = events.getLast().data();
+        assertEquals("Order for 2 TRNC is ready, confirm it in the UI", response.path("answer").asText());
+        assertEquals("TRNC", response.path("pendingOrder").path("ticker").asText());
+        assertEquals("PENDING_CONFIRMATION", response.path("pendingOrder").path("status").asText());
+        assertEquals(0, new BigDecimal("9629.50").compareTo(response.path("pendingOrder").path("cashAfter").decimalValue()));
+
+        // The same message, the same trace and session as /chat.
+        mvc.perform(get("/traces/" + response.path("traceId").asText()).header(HEADER, "BRK-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.steps.length()").value(3));
+        assertEquals(List.of("buy 2 Training Corp common"), model.lastConversation().userMessages());
+    }
+
+    @Test
+    void aGuardRefusalIsStreamedAsAnErrorResult() throws Exception {
+        model.callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .answers("Which security do you mean?");
+
+        List<SseEvents.Event> events = stream("BRK-1", "s1", "buy 2 Training Corp common");
+
+        assertTrue(events.get(1).data().path("error").asBoolean());
+        assertTrue(events.getLast().data().path("pendingOrder").isNull());
+    }
+
+    @Test
+    void aStreamedMessageThatFailsIsAnErrorEventAndIsRolledBack() throws Exception {
+        model.callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}")
+                .fails(new IllegalStateException("Claude 529: {\"request_id\":\"secret\"}"));
+
+        List<SseEvents.Event> events = stream("BRK-1", "s1", "buy 2 TRNC");
+
+        assertEquals(List.of("tool_call", "tool_result", "error"), SseEvents.names(events));
+        assertEquals(502, events.getLast().data().path("status").asInt());
+        assertFalse(events.toString().contains("secret"));
+        assertEquals(OrderStatus.CANCELLED, broker.orderById("ORD-1").orElseThrow().getStatus());
+        assertTrue(model.lastConversation().userMessages().isEmpty());
     }
 }
