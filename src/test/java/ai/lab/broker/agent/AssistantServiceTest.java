@@ -109,6 +109,19 @@ class AssistantServiceTest {
     }
 
     @Test
+    void onlyOneOrderPerMessageSoTheShownOrderIsTheOnlyConfirmableOne() throws Exception {
+        callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
+        callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":3}");
+        answers("Order ORD-1 created; confirm it before the next one");
+
+        ChatResponse response = service.chat("BRK-1", "s1", "buy 2 TRNC and then 3 TRNC");
+
+        assertEquals("ORD-1", response.pendingOrder().orderId());
+        assertEquals(2, response.pendingOrder().quantity());
+        assertTrue(broker.orderById("ORD-2").isEmpty(), "the second order was never created");
+    }
+
+    @Test
     void createdOrderBecomesPendingOrder() throws Exception {
         callsTool("place_order", "{\"side\":\"BUY\",\"ticker\":\"TRNC\",\"quantity\":2}");
         answers("Order created, confirm it in the UI");

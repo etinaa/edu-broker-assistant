@@ -84,7 +84,9 @@ public class AssistantService {
      *       this session (as far as the history still holds them), otherwise the call is rejected without running.
      *       The whole session counts, not just this message: "buy 100 Sample" → candidates → "Logistics" places
      *       SMPL, which came from the previous message's find_security. An {@link AmbiguityGuard} then refuses
-     *       other tools after find_security returned CANDIDATES, so the model asks instead of picking one.</li>
+     *       other tools after find_security returned CANDIDATES, so the model asks instead of picking one.
+     *       A {@link SingleOrderGuard} allows one created order per message: the response has a single
+     *       pendingOrder, and a second order would stay confirmable without the user ever seeing it.</li>
      *   <li>When the step limit is reached, the answer is an honest "could not finish", not a fragment of the
      *       model's text.</li>
      *   <li>pendingOrder and candidates are built from this message's tool results, not from the model's text.</li>
@@ -105,11 +107,11 @@ public class AssistantService {
             conversation.addUserMessage(message);
             try {
                 ToolLoop.Result result = runLoop(conversation, new GroundedExecutor(conversation.seen(),
-                        new AmbiguityGuard(call -> {
+                        new AmbiguityGuard(new SingleOrderGuard(call -> {
                             ToolResult toolResult = tools.execute(accountId, call);
                             executed.add(toolResult);
                             return toolResult;
-                        })));
+                        }))));
                 // Built inside the try: until the response exists, the user has seen nothing of this message.
                 return respond(accountId, sessionId, message, conversation.name(), result);
             } catch (Throwable e) {
