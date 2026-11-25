@@ -3,6 +3,9 @@ package ai.lab.broker.agent;
 import ai.lab.broker.llm.ToolConversation.ToolCall;
 import ai.lab.broker.llm.ToolConversation.ToolResult;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.MissingNode;
+
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -29,8 +32,11 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
 
     @Override
     public ToolResult apply(ToolCall call) {
+        // Without arguments there is nothing to check: the tool itself reports the missing argument.
+        JsonNode arguments = call.arguments() == null ? MissingNode.getInstance() : call.arguments();
         for (String argument : IDENTIFIER_ARGUMENTS) {
-            String value = call.arguments().path(argument).asText();
+            // Stripped the same way BrokerTools strips it, so " TRNC" is checked as the TRNC the tool would use.
+            String value = arguments.path(argument).asText("").strip();
             if (!value.isEmpty() && !wasSeen(value)) {
                 return ToolResult.error(call, "Value " + argument + "='" + value + "' appears neither in the user's messages "
                         + "nor in tool results. Do not substitute or correct identifiers: "

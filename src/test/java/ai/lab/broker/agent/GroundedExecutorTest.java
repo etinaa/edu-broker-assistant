@@ -63,6 +63,23 @@ class GroundedExecutorTest {
     }
 
     @Test
+    void tickerIsCheckedWithoutSurroundingSpacesAsTheToolWouldUseIt() throws Exception {
+        String seen = "{\"securities\":[{\"ticker\":\"TRNC\"}]}";
+
+        assertFalse(executor(seen, "{}").apply(call("get_quote", "{\"ticker\":\" TRNC \"}")).error());
+        assertTrue(executor(seen, "{}").apply(call("get_quote", "{\"ticker\":\" TRN \"}")).error());
+    }
+
+    @Test
+    void callWithoutArgumentsIsPassedToTheToolThatReportsTheSchemaError() {
+        ToolResult result = executor("", "missing ticker")
+                .apply(new ToolCall("c1", "get_quote", null));
+
+        assertEquals("missing ticker", result.content());
+        assertEquals(1, executed.size());
+    }
+
+    @Test
     void callsWithoutTickerAreNotChecked() throws Exception {
         assertFalse(executor("", "{}").apply(call("get_account_summary", "{}")).error());
     }
