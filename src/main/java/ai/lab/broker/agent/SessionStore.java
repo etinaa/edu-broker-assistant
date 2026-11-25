@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 /**
@@ -22,14 +24,26 @@ import java.util.function.Supplier;
  * The number of sessions is bounded by {@code agent.max-sessions}: the least recently used session is evicted when
  * a new one does not fit. sessionId is chosen by the client, so without the bound every new id would stay in memory
  * forever. An evicted session simply starts over with an empty history.
+ * <p>
+ * Each session has its own lock: one message of a session at a time. {@link AssistantService} holds it for the
+ * whole answer (model calls included) and takes it with a timeout, so a second message is refused instead of
+ * waiting minutes. A session removed or evicted while someone waited for its lock is no longer
+ * {@link #isCurrent current}: the waiter takes the new session instead of writing into a forgotten one.
  */
 @Component
 public class SessionStore {
 
     private record Key(String accountId, String sessionId) {}
 
+    /** A conversation and the lock that lets one message of the session at a time use it. */
+    public record Session(ToolConversation conversation, ReentrantLock lock) {
+        Session(ToolConversation conversation) {
+            this(conversation, new ReentrantLock());
+        }
+    }
+
     /** Access order: get() moves a session to the end, so the eldest entry is the least recently used. */
-    private final Map<Key, ToolConversation> sessions;
+    private final Map<Key, Session> sessions;
     private final int maxHistoryMessages;
 
     public SessionStore(AgentProperties agent) {
@@ -43,16 +57,24 @@ public class SessionStore {
         int maxSessions = agent.maxSessions();
         this.sessions = new LinkedHashMap<>(16, 0.75f, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<Key, ToolConversation> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<Key, Session> eldest) {
                 return size() > maxSessions;
             }
         };
     }
 
     /** The factory only builds an object (no network call), so holding the store's lock while it runs is cheap. */
-    public synchronized ToolConversation getOrCreate(String accountId, String sessionId,
-                                                     Supplier<ToolConversation> factory) {
-        return sessions.computeIfAbsent(new Key(accountId, sessionId), key -> factory.get());
+    public synchronized Session getOrCreate(String accountId, String sessionId, Supplier<ToolConversation> factory) {
+        return sessions.computeIfAbsent(new Key(accountId, sessionId), key -> new Session(factory.get()));
+    }
+
+    public synchronized Optional<Session> find(String accountId, String sessionId) {
+        return Optional.ofNullable(sessions.get(new Key(accountId, sessionId)));
+    }
+
+    /** False if the session was removed or evicted (and maybe replaced by a new one) since it was taken. */
+    public synchronized boolean isCurrent(String accountId, String sessionId, Session session) {
+        return sessions.get(new Key(accountId, sessionId)) == session;
     }
 
     public synchronized int size() {
@@ -61,7 +83,7 @@ public class SessionStore {
 
     /**
      * Drops the oldest exchanges until the history fits the limit or only the latest exchange is left.
-     * Call it under the conversation's lock, before adding a new message.
+     * Call it under the session's lock, before adding a new message.
      *
      * @return the number of dropped exchanges
      */
@@ -73,8 +95,9 @@ public class SessionStore {
         return dropped;
     }
 
-    public synchronized void remove(String accountId, String sessionId) {
-        sessions.remove(new Key(accountId, sessionId));
+    /** Removes the session only if it is still this one, so a reset never drops a newer session by mistake. */
+    public synchronized void remove(String accountId, String sessionId, Session session) {
+        sessions.remove(new Key(accountId, sessionId), session);
     }
 
     public synchronized void clear() {

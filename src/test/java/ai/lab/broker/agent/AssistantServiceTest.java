@@ -16,10 +16,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +40,9 @@ class AssistantServiceTest {
     private int created;
     private RuntimeException failure;
     private RuntimeException toolResultsFailure;
+    /** When set, the model "thinks" inside send() until the test releases it: a long model call. */
+    private volatile CountDownLatch sendEntered;
+    private volatile CountDownLatch sendRelease;
 
     private BrokerService broker;
     private TraceStore traces;
@@ -42,12 +51,12 @@ class AssistantServiceTest {
     @BeforeEach
     void setUp() {
         broker = TestBroker.demo();
-        traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100));
+        traces = new TraceStore(new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2)));
         service = new AssistantService((system, tools) -> {
             created++;
             return new ScriptedConversation();
-        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40, 100, 100)), traces,
-                new AgentProperties(3, 0.0, 40, 100, 100));
+        }, new BrokerTools(broker), broker, new SessionStore(new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2))), traces,
+                new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2)));
     }
 
     private static LlmResponse response(String text) {
@@ -185,7 +194,7 @@ class AssistantServiceTest {
 
     @Test
     void failureAfterTheLoopRollsBackHistoryAndCancelsTheOrder() throws Exception {
-        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100);
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofSeconds(2));
         RuntimeException traceFailure = new IllegalArgumentException("trace store bug");
         TraceStore failingTraces = new TraceStore(agent) {
             @Override
@@ -207,8 +216,46 @@ class AssistantServiceTest {
     }
 
     @Test
+    void busySessionRefusesAnotherMessageAndResetWhileOtherSessionsWork() throws Exception {
+        AgentProperties agent = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofMillis(50));
+        AssistantService busy = new AssistantService((system, tools) -> new ScriptedConversation(),
+                new BrokerTools(broker), broker, new SessionStore(agent), traces, agent);
+        answers("first");
+        answers("other session");
+        sendEntered = new CountDownLatch(1);
+        sendRelease = new CountDownLatch(1);
+        CountDownLatch release = sendRelease;
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<ChatResponse> first = pool.submit(() -> busy.chat("BRK-1", "s1", "one"));
+            assertTrue(sendEntered.await(5, TimeUnit.SECONDS));
+            sendRelease = null; // only the first message is slow
+
+            assertThrows(SessionBusyException.class, () -> busy.chat("BRK-1", "s1", "two"));
+            assertThrows(SessionBusyException.class, () -> busy.resetSession("BRK-1", "s1"));
+            assertEquals("other session", busy.chat("BRK-1", "s2", "hi").answer());
+
+            release.countDown();
+            assertEquals("first", first.get(5, TimeUnit.SECONDS).answer());
+            assertEquals(List.of("one", "hi"), userMessages); // "two" never reached the history
+            assertDoesNotThrow(() -> busy.resetSession("BRK-1", "s1"));
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void negativeSessionBusyTimeoutIsRejectedAtStartup() {
+        AgentProperties negative = new AgentProperties(3, 0.0, 40, 100, 100, Duration.ofMillis(-1));
+
+        assertThrows(IllegalArgumentException.class, () -> new AssistantService((system, tools) -> null,
+                new BrokerTools(broker), broker, new SessionStore(negative), new TraceStore(negative), negative));
+    }
+
+    @Test
     void nonPositiveMaxStepsIsRejectedAtStartup() {
-        AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100);
+        AgentProperties zeroSteps = new AgentProperties(0, 0.0, 40, 100, 100, Duration.ofSeconds(2));
 
         assertThrows(IllegalArgumentException.class, () -> new AssistantService((system, tools) -> null,
                 new BrokerTools(broker), broker, new SessionStore(zeroSteps), new TraceStore(zeroSteps), zeroSteps));
@@ -230,12 +277,18 @@ class AssistantServiceTest {
         }
 
         @Override
-        public Turn send() {
+        public Turn send() throws InterruptedException {
             if (failure != null) {
                 throw failure;
             }
             size++;
-            return script.removeFirst();
+            Turn turn = script.removeFirst();
+            CountDownLatch release = sendRelease;
+            if (release != null) {
+                sendEntered.countDown();
+                release.await();
+            }
+            return turn;
         }
 
         @Override

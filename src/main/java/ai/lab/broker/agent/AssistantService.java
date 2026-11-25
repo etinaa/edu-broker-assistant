@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -60,13 +61,19 @@ public class AssistantService {
         if (agent.maxSteps() <= 0) {
             throw new IllegalArgumentException("agent.max-steps must be positive: " + agent.maxSteps());
         }
+        if (agent.sessionBusyTimeout() == null || agent.sessionBusyTimeout().isNegative()) {
+            throw new IllegalArgumentException(
+                    "agent.session-busy-timeout must be zero or positive: " + agent.sessionBusyTimeout());
+        }
     }
 
     /**
      * Task 4. accountId comes from the request header and travels only through code: the model never sees it.
      * <ol>
-     *   <li>The session's conversation is locked for the whole request, so two parallel messages of one session
-     *       cannot interleave in its history.</li>
+     *   <li>The session is locked for the whole request, so two parallel messages of one session cannot interleave
+     *       in its history. The lock is awaited at most {@code agent.session-busy-timeout}; then the message is
+     *       refused with {@link SessionBusyException} instead of holding a server thread while the model answers
+     *       the other one.</li>
      *   <li>Before the new message, the history is trimmed to the session limit ({@link SessionStore#fitHistory}).</li>
      *   <li>The executor is created per request and closes over accountId. It is wrapped in a
      *       {@link GroundedExecutor}: a ticker must appear in the user's messages or the successful tool results of
@@ -84,10 +91,9 @@ public class AssistantService {
      * cancelled. The user never saw them, and a retry must not leave a duplicate.
      */
     public ChatResponse chat(String accountId, String sessionId, String message) {
-        ToolConversation conversation = sessions.getOrCreate(accountId, sessionId,
-                () -> conversations.create(SystemPrompt.TEXT, tools.definitions()));
-
-        synchronized (conversation) {
+        SessionStore.Session session = lockCurrentSession(accountId, sessionId);
+        try {
+            ToolConversation conversation = session.conversation();
             sessions.fitHistory(conversation);
             int sizeBefore = conversation.size();
             List<ToolResult> executed = new ArrayList<>();
@@ -105,6 +111,35 @@ public class AssistantService {
                 cancelCreatedOrders(accountId, executed);
                 throw e;
             }
+        } finally {
+            session.lock().unlock();
+        }
+    }
+
+    /**
+     * The session's lock, taken. If the session was reset or evicted while we waited, its conversation is forgotten:
+     * the message goes to the session that replaced it, never to a history nobody will see again.
+     */
+    private SessionStore.Session lockCurrentSession(String accountId, String sessionId) {
+        while (true) {
+            SessionStore.Session session = sessions.getOrCreate(accountId, sessionId,
+                    () -> conversations.create(SystemPrompt.TEXT, tools.definitions()));
+            lock(session);
+            if (sessions.isCurrent(accountId, sessionId, session)) {
+                return session;
+            }
+            session.lock().unlock();
+        }
+    }
+
+    private void lock(SessionStore.Session session) {
+        try {
+            if (!session.lock().tryLock(agent.sessionBusyTimeout().toMillis(), TimeUnit.MILLISECONDS)) {
+                throw new SessionBusyException();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SessionBusyException();
         }
     }
 
@@ -126,9 +161,19 @@ public class AssistantService {
         return new ChatResponse(answer, pendingOrder, candidates, result.limitReached(), trace.id());
     }
 
-    /** New session with an empty history. */
+    /**
+     * New session with an empty history. Waits, like a message, for the session's current message to be answered:
+     * a reset in the middle of an answer would leave that answer in a history nobody sees.
+     */
     public void resetSession(String accountId, String sessionId) {
-        sessions.remove(accountId, sessionId);
+        sessions.find(accountId, sessionId).ifPresent(session -> {
+            lock(session);
+            try {
+                sessions.remove(accountId, sessionId, session);
+            } finally {
+                session.lock().unlock();
+            }
+        });
     }
 
     private ToolLoop.Result runLoop(ToolConversation conversation, Function<ToolCall, ToolResult> executor) {

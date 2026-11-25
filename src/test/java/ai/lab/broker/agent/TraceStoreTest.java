@@ -4,6 +4,7 @@ import ai.lab.broker.config.AgentProperties;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TraceStoreTest {
 
     private static TraceStore store(int maxTraces) {
-        return new TraceStore(new AgentProperties(6, 0.0, 40, 100, maxTraces));
+        return new TraceStore(new AgentProperties(6, 0.0, 40, 100, maxTraces, Duration.ofSeconds(2)));
     }
 
     private static Trace trace(TraceStore store) {

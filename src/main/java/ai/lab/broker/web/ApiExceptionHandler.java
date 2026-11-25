@@ -1,6 +1,7 @@
 package ai.lab.broker.web;
 
 import ai.lab.broker.agent.AssistantUnavailableException;
+import ai.lab.broker.agent.SessionBusyException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -23,6 +24,12 @@ class ApiExceptionHandler {
     @ExceptionHandler(AssistantUnavailableException.class)
     ProblemDetail assistantUnavailable(AssistantUnavailableException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+
+    /** Another message of the session is being answered: 409, the client retries after it. */
+    @ExceptionHandler(SessionBusyException.class)
+    ProblemDetail sessionBusy(SessionBusyException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(NoSuchElementException.class)

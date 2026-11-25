@@ -5,6 +5,7 @@ import ai.lab.broker.llm.ToolConversation;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -15,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SessionStoreTest {
 
     private static SessionStore store(int maxHistoryMessages) {
-        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages, 100, 100));
+        return new SessionStore(new AgentProperties(6, 0.0, maxHistoryMessages, 100, 100, Duration.ofSeconds(2)));
     }
 
     private static SessionStore storeWithMaxSessions(int maxSessions) {
-        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, 100));
+        return new SessionStore(new AgentProperties(6, 0.0, 10, maxSessions, 100, Duration.ofSeconds(2)));
     }
 
     @Test
@@ -54,7 +55,7 @@ class SessionStoreTest {
     @Test
     void leastRecentlyUsedSessionIsEvicted() {
         SessionStore store = storeWithMaxSessions(2);
-        ToolConversation first = store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1));
+        SessionStore.Session first = store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1));
         store.getOrCreate("BRK-1", "b", () -> new FakeConversation(1));
         store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1)); // "a" is used again, "b" is now eldest
         store.getOrCreate("BRK-1", "c", () -> new FakeConversation(1));
@@ -62,7 +63,7 @@ class SessionStoreTest {
         assertEquals(2, store.size());
         assertSame(first, store.getOrCreate("BRK-1", "a", () -> new FakeConversation(1)));
         ToolConversation fresh = new FakeConversation(1);
-        assertSame(fresh, store.getOrCreate("BRK-1", "b", () -> fresh));
+        assertSame(fresh, store.getOrCreate("BRK-1", "b", () -> fresh).conversation());
     }
 
     @Test
@@ -73,10 +74,24 @@ class SessionStoreTest {
     @Test
     void sessionsAreKeyedByAccountAndSessionId() {
         SessionStore store = store(10);
-        ToolConversation first = store.getOrCreate("BRK-1", "s", () -> new FakeConversation(1));
+        SessionStore.Session first = store.getOrCreate("BRK-1", "s", () -> new FakeConversation(1));
 
         assertSame(first, store.getOrCreate("BRK-1", "s", () -> new FakeConversation(1)));
         assertNotSame(first, store.getOrCreate("BRK-2", "s", () -> new FakeConversation(1)));
+    }
+
+    @Test
+    void removedSessionIsNoLongerCurrentAndANewerOneIsNotRemovedByMistake() {
+        SessionStore store = store(10);
+        SessionStore.Session old = store.getOrCreate("BRK-1", "s", () -> new FakeConversation(1));
+
+        store.remove("BRK-1", "s", old);
+        SessionStore.Session newer = store.getOrCreate("BRK-1", "s", () -> new FakeConversation(1));
+        store.remove("BRK-1", "s", old);
+
+        assertFalse(store.isCurrent("BRK-1", "s", old));
+        assertTrue(store.isCurrent("BRK-1", "s", newer));
+        assertSame(newer, store.find("BRK-1", "s").orElseThrow());
     }
 
     /** A history made of exchanges with the given numbers of messages. */

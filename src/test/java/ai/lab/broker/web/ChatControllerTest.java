@@ -1,6 +1,7 @@
 package ai.lab.broker.web;
 
 import ai.lab.broker.agent.AssistantService;
+import ai.lab.broker.agent.SessionBusyException;
 import ai.lab.broker.broker.BrokerService;
 import ai.lab.broker.domain.Account;
 import ai.lab.broker.web.dto.ChatResponse;
@@ -59,6 +60,17 @@ class ChatControllerTest {
                 .andExpect(status().isNotFound());
 
         verify(assistant, never()).chat(any(), any(), any());
+    }
+
+    @Test
+    void busySessionIs409() throws Exception {
+        when(broker.accountById("BRK-1")).thenReturn(Optional.of(new Account("BRK-1", BigDecimal.TEN)));
+        when(assistant.chat("BRK-1", "s1", "hi")).thenThrow(new SessionBusyException());
+
+        mvc.perform(post("/chat").header("X-Account-Id", "BRK-1")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("still being processed")));
     }
 
     @Test
