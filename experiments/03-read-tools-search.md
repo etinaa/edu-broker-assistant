@@ -46,8 +46,36 @@ The text checks are rough (regular expressions); the full answers are in `report
 
 ## Results (2026-11-25)
 
+### Russian wording
+
 - Before `AmbiguityGuard`, Ollama (qwen3.5:9b) got `CANDIDATES` on question 4 but picked TRNC itself (the response
   still had three `candidates`). Claude asked.
 - After `nextStep` in the `find_security` result and `AmbiguityGuard` in the code: 5/5 — the model lists the
   options and asks.
-- Conclusion: for ambiguous search the code is more reliable than the tool description.
+
+### English wording
+
+The guard did not help with the English question: Ollama never called `find_security`. The `get_account_summary`
+description offered that tool for "how many X do I have", so the model read the summary, saw "Training Corp.
+common stock" (TRNC is the only Training security in the account) and answered "20 TRNC". Without a search there
+are no `CANDIDATES`, and `AmbiguityGuard` has nothing to enforce.
+
+Fix in the tool descriptions (commit `3519032`): the summary example became "how many TRNC do I have", and both
+`get_account_summary` and `find_security` say to call `find_security` first when the user names a security by
+name rather than an exact ticker or ISIN.
+
+| ollama/qwen3.5:9b, options offered | Before | After |
+|---|---|---|
+| How many Training do I have? | 0/5 | 5/5, then 10/10 in this script |
+| Buy 10 Training | 5/5 | 5/5 |
+| Sell 10 Training | — | 5/5 |
+
+Claude offered the options in every repeat both before and after (5/5, then 10/10). Questions 1–4, 13, 14 after
+the fix: 6/6 on both models; Claude 2.2 steps and $0.0042 per dialogue, ~2.0 s; Ollama 2.2 steps, ~12.8 s.
+
+### Conclusion
+
+Each layer covers a different failure. The code (`AmbiguityGuard`) stops the model from picking one candidate,
+but only once it has searched. Whether it searches at all is decided by the tool descriptions. A description is
+not a guarantee: if another model skips the search again, the next step is in code, an optional `query`
+parameter of `get_account_summary` that goes through the same search.

@@ -50,5 +50,20 @@ spaces and commas are removed from the text before the search (4,100.00 → 4100
 
 ## Results
 
-Done: the four tools in `BrokerTools` are implemented and tested. In the 2026-11-25 run (experiment 9),
-questions 5–10 passed on both models; Claude refused question 10 itself, without `place_order`.
+Done: the four tools in `BrokerTools` are implemented and tested. In the 2026-11-25 run (experiment 9, Russian
+wording), questions 5–10 passed on both models; Claude refused question 10 itself, without `place_order`.
+
+2026-11-25, English wording, after the tool description change:
+
+| | Correct | Steps | Per dialogue | HTTP |
+|---|---|---|---|---|
+| claude-haiku-4-5 | 6/6 | 2.2 | $0.0045 | ~2.6 s |
+| ollama/qwen3.5:9b | 6/6 | 3.0 | free | ~23.7 s |
+
+- **Numbers:** 0 mismatches. Every number the code computed (price, total, cash after, needed, available,
+  shortfall) appears in the model's text, on both models.
+- **Question 7:** Ollama answered "only 20 held" from `get_account_summary` without calling `place_order`, so
+  there is no code refusal in the trace to compare with. The outcome is right, but here the model applied the rule
+  itself; the code would have refused the same sale.
+- **Question 10:** Claude again asked about the fractional quantity without calling `place_order`; Ollama called it
+  and got the code's `INVALID_QUANTITY` refusal.

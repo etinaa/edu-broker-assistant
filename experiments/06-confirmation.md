@@ -47,4 +47,6 @@ Done (item 5 in `tasks.txt`): (a) only the first order is confirmed, the second 
 (b) execution at the current price, a move against the client of more than 2% → `PRICE_CHANGED`, in the client's
 favour — executed; (c) an overdue order is EXPIRED when read or confirmed; (d) a repeated confirm changes nothing.
 
-2026-11-25, ollama/qwen3.5:9b: every live check of (a), (c) and (d) passed.
+2026-11-25, ollama/qwen3.5:9b, English wording: every live check of (a), (c) and (d) passed, before and after the
+tool description change. The second 15 DEMO order failed with "needed 6150.00 USD, available 3850.00 USD, short by
+2300.00 USD"; the order with a 20 s lifetime was EXPIRED on the next read and its confirm got `ORDER_EXPIRED`.
