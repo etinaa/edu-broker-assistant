@@ -9,7 +9,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -31,12 +34,16 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** Tokens are runs of letters, digits and hyphens: "TRNC," and "(trnc)" both give the token trnc. */
+    private static final Pattern TOKEN_SEPARATORS = Pattern.compile("[^\\p{L}\\d-]+");
+
     private final Function<ToolCall, ToolResult> delegate;
-    private final StringBuilder seenText = new StringBuilder();
+    /** Everything seen, as lower-case tokens: each check is a set lookup instead of a regex over the history. */
+    private final Set<String> seenTokens = new HashSet<>();
 
     public GroundedExecutor(Seen seenSoFar, Function<ToolCall, ToolResult> delegate) {
         this.delegate = delegate;
-        seenSoFar.userMessages().forEach(message -> seenText.append(message).append('\n'));
+        seenSoFar.userMessages().forEach(this::addTokensOf);
         seenSoFar.toolResults().forEach(this::addTickersOf);
     }
 
@@ -65,7 +72,7 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         try {
             for (JsonNode ticker : JSON.readTree(toolResult).findValues("ticker")) {
                 if (ticker.isTextual()) {
-                    seenText.append(ticker.asText()).append('\n');
+                    addTokensOf(ticker.asText());
                 }
             }
         } catch (JsonProcessingException e) {
@@ -73,10 +80,19 @@ public final class GroundedExecutor implements Function<ToolCall, ToolResult> {
         }
     }
 
-    /** As a whole token, ignoring case: trnc → TRNC is an allowed normalization, TRN → TRNC is not. */
+    private void addTokensOf(String text) {
+        for (String token : TOKEN_SEPARATORS.split(text)) {
+            if (!token.isEmpty()) {
+                seenTokens.add(token.toLowerCase(Locale.ROOT));
+            }
+        }
+    }
+
+    /**
+     * As a whole token, ignoring case: trnc → TRNC is an allowed normalization, TRN → TRNC is not. A value that is not
+     * a single token (has spaces or dots) is never seen; the demo tickers are letters only.
+     */
     private boolean wasSeen(String value) {
-        Pattern token = Pattern.compile("(?<![\\p{L}\\d-])" + Pattern.quote(value) + "(?![\\p{L}\\d-])",
-                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
-        return token.matcher(seenText).find();
+        return !TOKEN_SEPARATORS.matcher(value).find() && seenTokens.contains(value.toLowerCase(Locale.ROOT));
     }
 }

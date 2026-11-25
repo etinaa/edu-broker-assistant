@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * All money rules live here, on BigDecimal, with no LLM involved. The model only understands the intent and
@@ -38,6 +39,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class BrokerService {
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private final SecurityCatalog securities;
     private final AccountRepository accounts;
@@ -279,6 +282,6 @@ public class BrokerService {
 
     /** Case, dots and extra spaces do not affect the name search: "Sample  Logistics Ltd." ≡ "sample logistics ltd". */
     private static String normalizeName(String name) {
-        return name.toLowerCase(Locale.ROOT).replace('.', ' ').trim().replaceAll("\\s+", " ");
+        return WHITESPACE.matcher(name.toLowerCase(Locale.ROOT).replace('.', ' ').trim()).replaceAll(" ");
     }
 }

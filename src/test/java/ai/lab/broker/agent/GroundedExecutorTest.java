@@ -124,6 +124,18 @@ class GroundedExecutorTest {
     }
 
     @Test
+    void tickerSurroundedByPunctuationInTheUsersTextIsSeen() throws Exception {
+        assertFalse(executor("купи 2 акции (trnc), пожалуйста.", "{}")
+                .apply(call("place_order", "{\"ticker\":\"TRNC\"}")).error());
+    }
+
+    @Test
+    void valueThatIsNotASingleTokenIsNeverSeen() throws Exception {
+        assertTrue(executor("buy TRNC common", "{}")
+                .apply(call("place_order", "{\"ticker\":\"TRNC common\"}")).error());
+    }
+
+    @Test
     void callsWithoutTickerAreNotChecked() throws Exception {
         assertFalse(executor("", "{}").apply(call("get_account_summary", "{}")).error());
     }
