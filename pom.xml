@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Spring Boot 4.x поддерживает Java 25. Если IDEA предложит свежий патч 4.x — смело обновляй. -->
+    <!-- Spring Boot 4.x supports Java 25. A newer 4.x patch release is safe to update to. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -16,16 +16,16 @@
     <artifactId>edu-broker-assistant</artifactId>
     <version>0.1.0</version>
     <name>edu-broker-assistant</name>
-    <description>Итоговый проект этапа 1: ассистент брокерского счёта</description>
+    <description>Final project of stage 1: a brokerage account assistant</description>
 
     <properties>
         <java.version>25</java.version>
         <!--
-            LLM-слой перенесён из stage1-llm-basics и работает с JSON-деревом Jackson 2 (com.fasterxml).
-            Сам Spring Boot 4 для REST использует Jackson 3 (tools.jackson) — они живут рядом и не мешают.
+            The LLM layer was moved from stage1-llm-basics and works with the Jackson 2 JSON tree (com.fasterxml).
+            Spring Boot 4 itself uses Jackson 3 (tools.jackson) for REST; the two coexist without conflicts.
         -->
         <jackson2.version>2.17.2</jackson2.version>
-        <!-- BOM Spring Boot даёт Lombok 1.18.42, он не работает на JDK 26. -->
+        <!-- The Spring Boot BOM brings Lombok 1.18.42, which does not work on JDK 26. -->
         <lombok.version>1.18.48</lombok.version>
     </properties>
 
@@ -69,7 +69,7 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- MockMvc для тестов контроллеров (задание 8). -->
+        <!-- MockMvc for the controller tests (task 8). -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
