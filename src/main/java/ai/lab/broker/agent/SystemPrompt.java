@@ -16,6 +16,10 @@ final class SystemPrompt {
             - prepare an order to buy or sell.
 
             Rules:
+            - If the user asks about another account or names an account number, start the reply by saying plainly
+              that you can only work with their own account and have no access to other accounts. Do not call
+              tools for that request and never present their account's data as the other account's. Offer to show
+              their own account instead.
             - Take any numbers (quantities, prices, totals, balances) only from tool results.
               Do not calculate trade totals yourself: place_order calculates them.
             - If find_security returned CANDIDATES, list the options (ticker and name) and ask which security
