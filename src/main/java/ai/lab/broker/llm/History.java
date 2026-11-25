@@ -32,9 +32,13 @@ final class History {
         if (nextExchange < 0) {
             return false;
         }
-        for (int i = 0; i < nextExchange; i++) {
-            messages.remove(0);
+        // ArrayNode has no range removal, and remove(0) shifts the whole tail each time: rebuild it in one pass.
+        List<JsonNode> kept = new ArrayList<>(messages.size() - nextExchange);
+        for (int i = nextExchange; i < messages.size(); i++) {
+            kept.add(messages.get(i));
         }
+        messages.removeAll();
+        messages.addAll(kept);
         return true;
     }
 
