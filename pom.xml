@@ -13,9 +13,9 @@
     </parent>
 
     <groupId>ai.lab</groupId>
-    <artifactId>stage1-broker-assistant</artifactId>
+    <artifactId>edu-broker-assistant</artifactId>
     <version>0.1.0</version>
-    <name>stage1-broker-assistant</name>
+    <name>edu-broker-assistant</name>
     <description>Итоговый проект этапа 1: ассистент брокерского счёта</description>
 
     <properties>

@@ -1,4 +1,4 @@
-# stage1-broker-assistant
+# edu-broker-assistant
 
 Итоговый проект этапа 1: ассистент брокерского счёта на Spring Boot. Задания и сценарии —
 [`docs/stage1-final-README.md`](../docs/stage1-final-README.md).

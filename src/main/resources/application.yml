@@ -1,6 +1,6 @@
 spring:
   application:
-    name: broker-assistant
+    name: edu-broker-assistant
 
 # The provider is chosen here (or with the LLM_PROVIDER variable); the code does not change (task 2).
 llm:
